@@ -364,7 +364,10 @@ async function saveToDB(){
     await fetch(SB_URL+'/rest/v1/planner_data',{method:'POST',
       headers:Object.assign({},sbHeader(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
       body:JSON.stringify({user_id:user.id,data:S})});
-  }catch(e){}
+    localStorage.setItem(KEY+'_'+user.id,JSON.stringify(S));
+  }catch(e){
+    try{localStorage.setItem(KEY+'_'+user.id,JSON.stringify(S))}catch(e2){}
+  }
 }
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveToDB,600)}
 
@@ -497,7 +500,7 @@ async function startApp(u){
   document.getElementById("appWrap").classList.add("on");
   document.getElementById("userbtn").textContent=(u.email||'').split("@")[0]+" →";
   var raw=await loadFromDB();
-  if(!raw){try{var v=localStorage.getItem(KEY);if(v)raw=JSON.parse(v)}catch(e){}}
+  if(!raw){try{var v=localStorage.getItem(KEY+'_'+u.id);if(!v)v=localStorage.getItem(KEY);if(v)raw=JSON.parse(v)}catch(e){}}
   S=raw?migrate(raw):seed();
   sel=todayKey();
   maybeWeeklyReset();
@@ -586,7 +589,7 @@ async function doAuth(){
           return(d&&m&&y)?y+'-'+m+'-'+d:'';
         })()}});
       if(d.error||d.msg){showAuthMsg(d.error||d.msg||'Ошибка','err');btn.disabled=false;btn.textContent='Создать аккаунт';return}
-      showAuthMsg('Письмо отправлено на '+email+'. Подтверди почту, потом войди.','ok');
+      showAuthMsg('Письмо с подтверждением отправлено на '+email+'. Пожалуйста, подтверди адрес — после этого можно войти.','ok');
       btn.disabled=false;btn.textContent='Создать аккаунт';
     }else{
       var d=await sbPost('/auth/v1/token?grant_type=password',{email:email,password:pass});
@@ -655,18 +658,32 @@ function renderWeek(){
     if(vis.some(q=>q.done<need(q))){
       const c=document.createElement("button");c.className="carry";c.textContent="Перенести";
       c.onclick=ev=>{ev.stopPropagation();carryModal(k)};el.appendChild(c);
-      const sk=document.createElement("button");sk.className="skip";sk.textContent="Забыть долг";
-      sk.onclick=ev=>{ev.stopPropagation();skipDebt(k)};el.appendChild(sk);
+      const pen=document.createElement("button");pen.className="skip";pen.textContent="✎ Изменить план";
+      pen.onclick=ev=>{ev.stopPropagation();quotaModal(k)};el.appendChild(pen);
     }
     el.onclick=()=>{sel=k;render()};
     box.appendChild(el);
   }
 }
 
-function skipDebt(k){
-  const d=day(k),miss=d.quota.filter(q=>q.done<need(q));
-  miss.forEach(q=>q.skipped+=(need(q)-q.done));
-  scheduleSave();render();toast("Долг списан. В статистике за неделю учтётся исходный план.");
+function quotaModal(k){
+  const d=day(k);
+  const draw=()=>{
+    openModal('<h3>План на '+human(k).toLowerCase()+'</h3>'+
+      '<p class="lead">Измени план этого дня: переименуй показатель, поправь число или убери крестиком. Крестик убирает только в этот день — в остальных всё остаётся.</p>'+
+      '<div id="ql">'+d.quota.map((q,i)=>'<div class="subrow">'+
+        '<input type="text" data-n="'+i+'" value="'+esc(q.n)+'" style="flex:1">'+
+        '<input type="number" data-g="'+i+'" min="0" value="'+q.goal+'" style="width:75px">'+
+        (q.manual?'<button data-rst="'+i+'" style="padding:0 8px" title="Вернуть к повтору">↺</button>':'')+
+        '<button data-rm="'+i+'" style="padding:0 8px">×</button></div>').join("")+'</div>'+
+      '<button class="smalladd" id="qadd" style="width:auto;padding:9px 16px;margin-top:8px">+ добавить показатель</button>'+
+      '<div class="acts"><button class="go" data-x>Готово</button></div>');
+    document.querySelectorAll("#ql [data-n]").forEach(el=>el.oninput=e=>{d.quota[+el.dataset.n].n=e.target.value;scheduleSave()});
+    document.querySelectorAll("#ql [data-g]").forEach(el=>el.oninput=e=>{const q=d.quota[+el.dataset.g];q.goal=Math.max(0,+e.target.value||0);q.manual=true;scheduleSave();renderWeek()});
+    document.querySelectorAll("#ql [data-rst]").forEach(el=>el.onclick=()=>{delete d.quota[+el.dataset.rst].manual;scheduleSave();render();draw()});
+    document.querySelectorAll("#ql [data-rm]").forEach(el=>el.onclick=()=>{d.quota.splice(+el.dataset.rm,1);scheduleSave();render();draw()});
+    document.getElementById("qadd").onclick=()=>{d.quota.push({id:uid(),n:"Новый показатель",goal:1,done:0,moved:0,extra:0,skipped:0,manual:true});scheduleSave();render();draw()};
+  };draw();
 }
 
 /* ---------- weekly stats ---------- */
@@ -818,7 +835,7 @@ function taskModal(t){
     '<div class="mf"><label>Задача</label><input type="text" id="tn" value="'+esc(draft.n)+'" placeholder="Что нужно сделать"></div>'+
     '<div class="two"><div class="mf"><label>Важность</label><div class="chips" id="imp">'+IMP.map(x=>'<button class="chip'+(draft.imp===x[0]?" on":"")+'" data-v="'+x[0]+'">'+x[1]+"</button>").join("")+'</div></div>'+
     '<div class="mf"><label>Срочность</label><div class="chips" id="urg">'+URG.map(x=>'<button class="chip'+(draft.urg===x[0]?" on":"")+'" data-v="'+x[0]+'">'+x[1]+"</button>").join("")+'</div></div></div>'+
-    '<div class="mf"><label>Вес</label><div class="range"><input type="range" id="wr" min="1" max="60" value="'+draft.w+'"><div class="val" id="wv">'+draft.w+'%</div></div><div class="hint" id="wh"></div></div>'+
+    '<div class="mf"><label>Вес</label><div class="range"><input type="range" id="wr" min="1" max="100" value="'+draft.w+'"><div class="val" id="wv">'+draft.w+'%</div></div><div class="hint" id="wh"></div></div>'+
     '<div class="mf"><label>Плашка</label><div class="chips" id="bd">'+BADGES.map((bx,i)=>'<button class="chip'+(draft.badge&&draft.badge.t===bx.t?" on":"")+'" data-i="'+i+'">'+bx.t+"</button>").join("")+'<button class="chip" data-i="own">+ своя</button><button class="chip'+(draft.badge===null&&!isNew?" on":"")+'" data-i="none">Без плашки</button></div>'+
     '<input type="text" id="ownb" placeholder="Текст плашки" style="margin-top:8px;display:none" value=""></div>'+
     '<div class="mf"><label>Подпункты</label><div id="subs"></div><button class="smalladd" id="addsub" style="width:auto;padding:8px 14px">+ шаг</button>'+
