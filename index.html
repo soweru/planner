@@ -1,201 +1,283 @@
+<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Планер</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.39.3/umd/supabase.min.js"></script>
 <style>
 :root{
-  --ink:#0f1424; --ink2:#4a566e; --mut:#8a94a8;
-  --paper:#EEF0F5; --card:#fff; --line:#d7dbe5;
-  --blue:#2B44E0; --amber:#E8820C; --green:#159A66; --red:#D8391F;
+  --ink:#0f1424;--ink2:#4a566e;--mut:#8a94a8;
+  --paper:#EEF0F5;--card:#fff;--line:#d7dbe5;
+  --blue:#2B44E0;--amber:#E8820C;--green:#159A66;--red:#D8391F;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-size:16px;line-height:1.45;
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:18px 40px 80px}
-.wrap{max-width:1180px;margin:0 auto}
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:0}
 button{font:inherit;color:inherit;cursor:pointer}
-h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);margin:0 0 12px;font-weight:700;
-  display:flex;align-items:center;gap:10px}
-h2 .h2btn{margin-left:auto;font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink2);
-  border:1px solid var(--line);background:var(--card);border-radius:8px;padding:4px 10px;font-weight:600}
 
-.head{position:sticky;top:0;z-index:20;background:var(--paper);padding:10px 0 14px;border-bottom:1px solid var(--line);margin-bottom:18px}
-.pager{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.pager button{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:19px;line-height:1}
-.pager .dt{font-size:15px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink2);font-weight:700}
-.pager .tb{width:auto;padding:0 13px;font-size:14px;height:34px;color:var(--ink2)}
-.bigrow{display:flex;align-items:baseline;gap:16px;margin:8px 0 10px;flex-wrap:wrap}
-.big{font-family:var(--mono);font-size:66px;font-weight:600;letter-spacing:-.04em;line-height:.9}
-.bigsub{font-size:15px;color:var(--ink2);max-width:520px}
-.segs{display:flex;gap:4px;height:16px}
-.seg{background:#dee2ec;border-radius:3px;overflow:hidden;min-width:4px}
-.seg i{display:block;height:100%;background:var(--blue);transition:width .35s}
+/* AUTH */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.auth-box{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:36px;
+  width:min(420px,100%)}
+.auth-box h1{margin:0 0 6px;font-size:26px}
+.auth-box .sub{color:var(--ink2);font-size:15px;margin:0 0 28px}
+.auth-tabs{display:flex;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:24px}
+.auth-tabs button{flex:1;padding:10px;border:none;background:#f5f7fb;font-weight:600;font-size:15px}
+.auth-tabs button.on{background:var(--ink);color:#fff}
+.f{margin-bottom:16px}
+.f label{display:block;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin-bottom:7px}
+.f input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe}
+.f input:focus{outline:2px solid var(--blue);border-color:transparent}
+.btn-full{width:100%;padding:14px;border-radius:12px;border:none;background:var(--ink);color:#fff;
+  font-size:16px;font-weight:700;margin-top:8px}
+.btn-full:disabled{opacity:.5;cursor:not-allowed}
+.auth-err{color:var(--red);font-size:14px;margin-top:10px;display:none}
+.auth-err.on{display:block}
+
+/* APP */
+.app{display:none;padding:18px 40px 80px}
+.app.on{display:block}
+.wrap{max-width:1180px;margin:0 auto}
+h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);margin:0 0 12px;font-weight:700}
+
+.head{position:sticky;top:0;z-index:20;background:var(--paper);padding:10px 0 14px;
+  border-bottom:1px solid var(--line);margin-bottom:18px}
+.pager{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pager .nav{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:18px;line-height:1}
+.pager .dt{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);font-weight:700}
+.pager .tb{width:auto;padding:0 12px;font-size:13px;height:34px;color:var(--ink2);
+  border:1px solid var(--line);background:var(--card);border-radius:10px}
+.pager .tb.user{color:var(--mut);font-size:12px}
+.bigrow{display:flex;align-items:baseline;gap:14px;margin:8px 0 10px;flex-wrap:wrap}
+.big{font-family:var(--mono);font-size:64px;font-weight:600;letter-spacing:-.04em;line-height:.9}
+.bigsub{font-size:14px;color:var(--ink2);max-width:480px}
+.segs{display:flex;gap:3px;height:14px}
+.seg{background:#dee2ec;border-radius:2px;overflow:hidden;min-width:3px}
+.seg i{display:block;height:100%;background:var(--blue);transition:width .3s}
 .seg.done i{background:var(--green)}
-.seg.free{background:repeating-linear-gradient(135deg,#e4e7ef 0 6px,#dbdfe9 6px 12px)}
-.dream{background:#fff8ec;border:1px solid #f3ddb8;border-radius:12px;padding:10px 14px;margin:0 0 18px;
-  font-size:15px;color:#7a5717;display:flex;gap:10px;align-items:center}
-.dream b{color:#5d420f}
-.dream button{margin-left:auto;border:none;background:none;color:#b08a45;font-size:18px;line-height:1}
+.seg.free{background:repeating-linear-gradient(135deg,#e4e7ef 0 5px,#dbdfe9 5px 10px)}
 
-.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:24px}
-.wd{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:10px;text-align:left}
-.wd.sel{border-color:var(--ink);box-shadow:0 3px 0 var(--ink)}
+/* WEEK */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-bottom:14px}
+.wd{background:var(--card);border:2px solid var(--line);border-radius:12px;padding:9px;cursor:pointer}
+.wd.sel{border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
 .wd.ok{border-color:var(--green);background:#f2fbf7}
-.wd.late{border-color:var(--red);background:#fef4f2}
-.wd .dname{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);
-  margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:4px}
-.wd .dname .pen{border:none;background:none;color:var(--mut);font-size:12px;padding:0 2px}
-.q{display:flex;align-items:center;gap:5px;margin:5px 0;font-size:13.5px}
+.wd.late{border-color:#fca5a5;background:#fef4f2}
+.wd .dn{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);
+  margin-bottom:6px;display:flex;justify-content:space-between}
+.q{display:flex;align-items:center;gap:4px;margin:4px 0;font-size:12.5px}
 .q .qn{flex:1;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.q .qv{font-family:var(--mono);font-size:13.5px}
+.q .qv{font-family:var(--mono);font-size:12px}
 .q .qv.ok{color:var(--green);font-weight:700}
-.q button{width:23px;height:23px;border-radius:7px;border:1px solid var(--line);background:#f2f4f9;font-size:14px;line-height:1;padding:0}
-.q .adj{font-family:var(--mono);font-size:11px;color:var(--mut)}
-.wd .carry{margin-top:9px;font-size:12px;color:var(--ink2);font-weight:600;background:#f1f3f8;
-  border:1px solid var(--line);border-radius:8px;padding:5px 8px;width:100%;text-align:center}
-.wd .carry:hover{background:#e7eaf2}
-.wd .carry.undo{color:var(--mut);font-weight:500;background:none;border-style:dashed;margin-top:5px}
+.q button{width:20px;height:20px;border-radius:5px;border:1px solid var(--line);background:#f2f4f9;font-size:12px;line-height:1;padding:0}
+.q .adj{font-family:var(--mono);font-size:10px;color:var(--mut)}
+.wd .carry{margin-top:7px;font-size:11px;color:var(--ink2);font-weight:600;background:#f1f3f8;
+  border:1px solid var(--line);border-radius:7px;padding:4px 7px;width:100%;text-align:center}
+.wd .skip{margin-top:4px;font-size:11px;color:var(--mut);border:1px dashed var(--line);
+  background:none;border-radius:7px;padding:4px 7px;width:100%;text-align:center}
 
-.cols{display:grid;grid-template-columns:1.9fr 1fr;gap:26px;align-items:start}
-@media(max-width:980px){.cols{grid-template-columns:1fr}.week{grid-template-columns:repeat(4,1fr)}body{padding:12px 14px 80px}.big{font-size:54px}}
+/* WEEKLY STATS */
+.wstats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:20px}
+.wstat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.wstat .wsn{font-size:12px;color:var(--ink2);margin-bottom:5px}
+.wstat .wsv{font-family:var(--mono);font-size:18px;font-weight:600;margin-bottom:4px}
+.wstat .wsbar{height:6px;background:#e3e7ef;border-radius:3px;overflow:hidden}
+.wstat .wsbar i{display:block;height:100%;border-radius:3px;transition:width .4s}
 
-.task{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px;margin-bottom:11px}
+/* LAYOUT */
+.cols{display:grid;grid-template-columns:1.85fr 1fr;gap:22px;align-items:start}
+@media(max-width:980px){.cols{grid-template-columns:1fr}.week{grid-template-columns:repeat(4,1fr)}.app{padding:12px 12px 80px}.big{font-size:50px}}
+
+/* TASKS */
+.task{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 16px;margin-bottom:10px}
 .task.done{border-color:#b7e2d0;background:#f5fbf8}
-.task.drag{opacity:.4}.task.over{border-color:var(--blue);border-style:dashed}
-.thead{display:flex;align-items:flex-start;gap:11px}
-.w{font-family:var(--mono);font-size:19px;font-weight:600;color:var(--blue);min-width:50px;text-align:right}
+.task.drag-over{border-color:var(--blue);border-style:dashed}
+.thead{display:flex;align-items:flex-start;gap:10px}
+.grip{cursor:grab;color:var(--mut);font-size:14px;flex:none;padding-top:2px}
+.w{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--blue);min-width:46px;text-align:right;flex:none}
 .task.done .w{color:var(--green)}
-.tname{flex:1;font-weight:700;font-size:17px}
-.tools{display:flex;gap:4px}
-.tools button{border:1px solid var(--line);background:#f4f6fa;border-radius:8px;width:29px;height:29px;font-size:13px;padding:0}
-.grip{cursor:grab;color:var(--mut);font-size:15px}
-.badge{font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:6px;font-weight:800;white-space:nowrap}
+.tname{flex:1;font-weight:700;font-size:16px}
+.tall-cb{width:19px;height:19px;accent-color:var(--blue);flex:none;margin-top:2px;cursor:pointer}
+.badge{font-size:10px;letter-spacing:.07em;text-transform:uppercase;padding:3px 7px;border-radius:5px;font-weight:800;white-space:nowrap;flex:none}
 .b-red{background:#ffe4e0;color:var(--red)}.b-amber{background:#fdf0dc;color:var(--amber)}
 .b-grey{background:#eceff5;color:var(--ink2)}.b-blue{background:#e5e8fd;color:var(--blue)}
-.meta{margin:8px 0 0 61px;font-size:13px;color:var(--mut);display:flex;gap:14px;flex-wrap:wrap}
-.subs{margin:10px 0 0 61px;display:flex;flex-direction:column;gap:2px}
-.subs.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:2px 14px}
-label.sub{display:flex;align-items:center;gap:10px;cursor:pointer;padding:5px 0;font-size:15.5px}
-label.sub input{width:18px;height:18px;accent-color:var(--blue);flex:none;cursor:pointer}
-label.sub .pct{font-family:var(--mono);font-size:12.5px;color:var(--mut);margin-left:auto}
+.tools{display:flex;gap:3px;flex:none}
+.tools button{border:1px solid var(--line);background:#f4f6fa;border-radius:7px;width:27px;height:27px;font-size:12px;padding:0}
+.meta{margin:7px 0 0 56px;font-size:12px;color:var(--mut);display:flex;gap:12px;flex-wrap:wrap}
+.subs{margin:9px 0 0 56px;display:flex;flex-direction:column;gap:1px}
+.subs.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:1px 12px}
+label.sub{display:flex;align-items:center;gap:9px;cursor:pointer;padding:4px 0;font-size:15px}
+label.sub input{width:17px;height:17px;accent-color:var(--blue);flex:none}
+label.sub .pct{font-family:var(--mono);font-size:12px;color:var(--mut);margin-left:auto}
 label.sub.on .txt{color:var(--mut);text-decoration:line-through}
-.addbtn{width:100%;border:2px dashed var(--line);background:none;border-radius:14px;padding:15px;font-size:16px;font-weight:600;color:var(--ink2)}
+.addbtn{width:100%;border:2px dashed var(--line);background:none;border-radius:13px;padding:14px;
+  font-size:15px;font-weight:600;color:var(--ink2)}
 .addbtn:hover{border-color:var(--blue);color:var(--blue)}
-.budget{font-size:14px;color:var(--ink2);margin-bottom:12px;font-family:var(--mono)}
-.budget b{color:var(--blue)}.budget .over{color:var(--amber)}
+.budget{font-size:13px;color:var(--ink2);margin-bottom:11px;font-family:var(--mono)}
+.budget b{color:var(--blue)}
 
-.side{position:sticky;top:180px;display:flex;flex-direction:column;gap:16px}
+/* SIDE */
+.side{position:sticky;top:170px;display:flex;flex-direction:column;gap:14px}
 @media(max-width:980px){.side{position:static}}
-.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
-.donutrow{display:flex;gap:16px;align-items:center}
-.donut text{font-family:var(--mono)}
-.bonus{list-style:none;margin:12px 0 0;padding:0;max-height:380px;overflow:auto}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px}
+.bonus{list-style:none;margin:10px 0 0;padding:0;max-height:320px;overflow:auto}
 .bonus li{border-bottom:1px solid #eef0f5}
-.bonus label{display:flex;gap:10px;align-items:flex-start;padding:9px 2px;font-size:15px;cursor:pointer}
-.bonus input{width:18px;height:18px;accent-color:var(--green);flex:none;margin-top:2px}
+.bonus label{display:flex;gap:9px;align-items:flex-start;padding:8px 2px;font-size:14px;cursor:pointer}
+.bonus input{width:17px;height:17px;accent-color:var(--green);flex:none;margin-top:2px}
 .bonus .bt{flex:1}
-.bonus .due{display:block;font-size:12px;color:var(--mut);margin-top:2px}
+.bonus .due{display:block;font-size:11px;color:var(--mut);margin-top:2px}
 .bonus .due.soon{color:var(--amber)}.bonus .due.over{color:var(--red)}
 .bonus label.on .bt{color:var(--mut);text-decoration:line-through}
-.bonus .ed{border:none;background:none;color:var(--mut);font-size:12px;padding:2px 4px;align-self:center}
+.bonus .ed{border:none;background:none;color:var(--mut);font-size:11px;padding:2px 4px;align-self:center}
 .star{color:var(--amber)}
-.smalladd{margin-top:10px;border:1px dashed var(--line);background:none;border-radius:10px;padding:9px;width:100%;font-size:14px;color:var(--ink2)}
+.smalladd{margin-top:9px;border:1px dashed var(--line);background:none;border-radius:9px;padding:8px;width:100%;font-size:13px;color:var(--ink2)}
+.donutrow{display:flex;gap:14px;align-items:center;margin-bottom:4px}
 
-.mask{position:fixed;inset:0;background:rgba(15,20,36,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+/* SOCIAL TRACKER */
+.socials{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.soc{background:#f8f9fc;border:1px solid var(--line);border-radius:10px;padding:10px}
+.soc .sname{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+.soc .sval{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--ink)}
+.soc .sdelta{font-size:12px;margin-top:2px}
+.soc .sdelta.up{color:var(--green)}.soc .sdelta.dn{color:var(--red)}.soc .sdelta.same{color:var(--mut)}
+.soc .sedit{width:100%;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font:inherit;font-size:14px;font-family:var(--mono);margin-top:7px;background:var(--card)}
+.soc-add{grid-column:1/-1;border:1px dashed var(--line);background:none;border-radius:10px;padding:9px;font-size:13px;color:var(--ink2)}
+
+/* MODAL */
+.mask{position:fixed;inset:0;background:rgba(15,20,36,.52);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
 .mask.on{display:flex}
-.modal{background:var(--card);border-radius:18px;padding:24px;width:min(680px,100%);max-height:92vh;overflow:auto}
-.modal h3{margin:0 0 8px;font-size:21px}
-.lead{font-size:14px;color:var(--ink2);margin:0 0 18px;line-height:1.5}
-.f{margin-bottom:18px}
-.f>label{display:block;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin-bottom:8px}
-.f input[type=text],.f input[type=number],.f input[type=date],.f textarea{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fbfcfe}
-.chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:#f5f7fb;border-radius:999px;padding:8px 14px;font-size:15px}
+.modal{background:var(--card);border-radius:16px;padding:22px;width:min(660px,100%);max-height:92vh;overflow:auto}
+.modal h3{margin:0 0 6px;font-size:20px}
+.lead{font-size:14px;color:var(--ink2);margin:0 0 16px;line-height:1.5}
+.mf{margin-bottom:15px}
+.mf>label{display:block;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin-bottom:7px}
+.mf input[type=text],.mf input[type=number],.mf input[type=date],.mf textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fbfcfe}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#f5f7fb;border-radius:999px;padding:7px 13px;font-size:14px}
 .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media(max-width:600px){.two{grid-template-columns:1fr}}
-.subrow{display:flex;gap:8px;margin-bottom:8px;align-items:center}
-.subrow input[type=text]{flex:1}.subrow input[type=number]{width:80px}
-.subrow .sp{font-family:var(--mono);font-size:13px;color:var(--mut);min-width:46px;text-align:right}
-.subrow button{border:1px solid var(--line);background:#f4f6fa;border-radius:8px;min-width:34px;height:38px;padding:0 10px}
-.hint{font-size:13px;color:var(--mut);margin-top:8px;line-height:1.45}
-.acts{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;flex-wrap:wrap}
-.acts button{padding:12px 20px;border-radius:11px;border:1px solid var(--line);background:#f4f6fa;font-weight:600}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:580px){.two{grid-template-columns:1fr}}
+.subrow{display:flex;gap:7px;margin-bottom:7px;align-items:center}
+.subrow input[type=text]{flex:1}.subrow input[type=number]{width:75px}
+.subrow .sp{font-family:var(--mono);font-size:12px;color:var(--mut);min-width:42px;text-align:right}
+.subrow button{border:1px solid var(--line);background:#f4f6fa;border-radius:7px;min-width:30px;height:36px;padding:0 8px}
+.hint{font-size:12.5px;color:var(--mut);margin-top:7px;line-height:1.45}
+.acts{display:flex;gap:9px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+.acts button{padding:11px 18px;border-radius:10px;border:1px solid var(--line);background:#f4f6fa;font-weight:600}
 .acts .go{background:var(--ink);color:#fff;border-color:var(--ink)}
 .acts .del{color:var(--red);margin-right:auto}
-.range{display:flex;align-items:center;gap:12px}
-.range input[type=range]{flex:1;accent-color:var(--blue)}
-.range .val{font-family:var(--mono);font-size:22px;min-width:62px;text-align:right}
-.opt{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;width:100%;text-align:left;background:#fbfcfe}
+.opt{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:8px;width:100%;text-align:left;background:#fbfcfe}
 .opt:hover{border-color:var(--ink)}
-.opt b{display:block;font-size:16px;margin-bottom:3px}
-.opt span{font-size:13px;color:var(--mut)}
-.goalrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.opt b{display:block;font-size:15px;margin-bottom:2px}
+.opt span{font-size:12px;color:var(--mut)}
+.range{display:flex;align-items:center;gap:10px}
+.range input[type=range]{flex:1;accent-color:var(--blue)}
+.range .val{font-family:var(--mono);font-size:20px;min-width:54px;text-align:right}
+.goalrow{display:flex;gap:7px;align-items:center;margin-bottom:7px}
 .goalrow input[type=text]{flex:1}
-.goalrow .dr{border:1px solid var(--line);background:#f5f7fb;border-radius:9px;padding:9px 11px;font-size:15px}
+.goalrow .dr{border:1px solid var(--line);background:#f5f7fb;border-radius:8px;padding:8px 10px;font-size:14px}
 .goalrow .dr.on{background:#fff3dd;border-color:#e8c98a;color:#8a6314}
-
-.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(160%);
-  background:var(--ink);color:#fff;padding:16px 22px;border-radius:14px;max-width:min(600px,92vw);
-  z-index:80;transition:transform .35s;font-size:16px;box-shadow:0 10px 30px rgba(15,20,36,.3);line-height:1.45}
+.dream{background:#fff8ec;border:1px solid #f3ddb8;border-radius:10px;padding:9px 12px;margin:0 0 16px;
+  font-size:14px;color:#7a5717;display:flex;gap:9px;align-items:center}
+.dream b{color:#5d420f}
+.dream button{margin-left:auto;border:none;background:none;color:#b08a45;font-size:16px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(160%);
+  background:var(--ink);color:#fff;padding:14px 20px;border-radius:12px;max-width:min(560px,92vw);
+  z-index:80;transition:transform .33s;font-size:15px;line-height:1.45}
 .toast.on{transform:translateX(-50%) translateY(0)}
+.archive{font-size:12px;color:var(--mut);text-align:center;margin-top:10px}
+.archive button{border:none;background:none;color:var(--blue);font-size:12px;text-decoration:underline}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
+<!-- AUTH SCREEN -->
+<div class="auth-wrap" id="authWrap">
+  <div class="auth-box">
+    <h1>Планер</h1>
+    <p class="sub">Войди, чтобы твои задачи были только твоими</p>
+    <div class="auth-tabs">
+      <button class="on" id="tabLogin">Войти</button>
+      <button id="tabReg">Регистрация</button>
+    </div>
+    <div class="mf"><label>Email</label><input type="email" id="aEmail" placeholder="почта@example.com" autocomplete="email"></div>
+    <div class="mf"><label>Пароль</label><input type="password" id="aPass" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="mf" id="aPass2wrap" style="display:none"><label>Пароль ещё раз</label><input type="password" id="aPass2" placeholder="••••••••"></div>
+    <button class="btn-full" id="aBtn">Войти</button>
+    <div class="auth-err" id="aErr"></div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div class="app" id="appWrap">
 <div class="wrap">
   <div class="head">
     <div class="pager">
-      <button id="prev">‹</button>
+      <button class="nav" id="prev">‹</button>
       <div class="dt" id="dt"></div>
-      <button id="next">›</button>
+      <button class="nav" id="next">›</button>
       <button class="tb" id="tobtn">сегодня</button>
-      <button class="tb" id="goalsbtn">цели и награды</button>
-      <button class="tb" id="rhythmbtn">повторы</button>
+      <button class="tb" id="repeatsbtn">повторы</button>
+      <button class="tb" id="goalsbtn">цели</button>
       <button class="tb" id="databtn">данные</button>
+      <button class="tb user" id="userbtn"></button>
     </div>
     <div class="bigrow"><div class="big" id="big">0%</div><div class="bigsub" id="bigsub"></div></div>
     <div class="segs" id="segs"></div>
   </div>
-
   <div id="dreambox"></div>
   <div class="week" id="weekstrip"></div>
-
+  <div class="wstats" id="wstats"></div>
   <div class="cols">
     <div>
       <h2>Задачи дня</h2>
       <div class="budget" id="budget"></div>
       <div id="tasks"></div>
       <button class="addbtn" id="addtask">+ Добавить задачу</button>
+      <div class="archive"><button id="archivebtn">архив удалённых задач</button></div>
     </div>
     <div class="side">
       <div class="panel">
         <h2>Можно не сегодня</h2>
         <div class="donutrow">
-          <svg width="104" height="104" viewBox="0 0 112 112" id="donut"></svg>
-          <div style="font-size:14px;color:var(--ink2)" id="bonustxt"></div>
+          <svg width="88" height="88" viewBox="0 0 112 112" id="donut"></svg>
+          <div style="font-size:13px;color:var(--ink2)" id="bonustxt"></div>
         </div>
         <ul class="bonus" id="bonus"></ul>
         <button class="smalladd" id="addbonus">+ Добавить необязательное</button>
       </div>
+      <div class="panel">
+        <h2>Соцсети</h2>
+        <div class="socials" id="socials"></div>
+      </div>
     </div>
   </div>
+</div>
 </div>
 
 <div class="mask" id="mask"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
+const SUPA_URL="https://dtiwlacligiqyjeeajqo.supabase.co";
+const SUPA_KEY="sb_publishable_WG2evSttf8_OnhtgKdb1PA_X7SApdzn";
+const {createClient}=supabase;
+const sb=createClient(SUPA_URL,SUPA_KEY);
+
 const KEY="planner_v3";
 const DAYNAMES=["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
 const SHORT=["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
 const MONTHS=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const IMP=[["hi","Очень важно"],["mid","Важно"],["low","Не важно"]];
 const URG=[["hi","Очень срочно"],["mid","Средней срочности"],["low","Не срочно"]];
-const BADGES=[{t:"Обязательно сейчас",c:"b-red"},{t:"До вечера",c:"b-amber"},{t:"Можно перенести на завтра",c:"b-grey"},{t:"Каждый день",c:"b-blue"}];
+const BADGES=[{t:"Обязательно сейчас",c:"b-red"},{t:"До вечера",c:"b-amber"},{t:"Можно перенести",c:"b-grey"},{t:"Каждый день",c:"b-blue"}];
 const SUGGEST={"hi-hi":22,"hi-mid":16,"hi-low":12,"mid-hi":14,"mid-mid":10,"mid-low":7,"low-hi":8,"low-mid":5,"low-low":3};
+const DOW=[[1,"Пн"],[2,"Вт"],[3,"Ср"],[4,"Чт"],[5,"Пт"],[6,"Сб"],[0,"Вс"]];
 
-let S=null,sel=null,dragId=null;
+let S=null,sel=null,user=null,dragId=null,saveTimer=null;
 
 const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=n=>(Math.round((+n||0)*10)/10).toString().replace(/\.0$/,"");
 function keyOf(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function dateOf(k){const[a,b,c]=k.split("-").map(Number);return new Date(a,b-1,c)}
 function shift(k,n){const d=dateOf(k);d.setDate(d.getDate()+n);return keyOf(d)}
@@ -203,162 +285,185 @@ const todayKey=()=>keyOf(new Date());
 function human(k){const d=dateOf(k);return DAYNAMES[d.getDay()]+" · "+d.getDate()+" "+MONTHS[d.getMonth()]}
 function shortHuman(k){const d=dateOf(k);return d.getDate()+" "+MONTHS[d.getMonth()]}
 const daysBetween=(a,b)=>Math.round((dateOf(b)-dateOf(a))/864e5);
-function sub(n,u){return{id:uid(),n:n,u:u||1,done:false}}
-function task(n,w,imp,urg,badge,subs,grid,sid){return{id:uid(),sid:sid||null,n,w,imp,urg,badge,subs,grid:!!grid}}
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const fmt=n=>(Math.round(n*10)/10).toString().replace(/\.0$/,"");
+const sub=(n,u)=>({id:uid(),n:n||"",u:+u||1,done:false});
+const task=(n,w,imp,urg,badge,subs,grid,sid)=>({id:uid(),sid:sid||null,n,w:+w||10,imp,urg,badge,subs,grid:!!grid});
 
-/* ---------- storage (works inside Claude and as a downloaded file) ---------- */
-const store={
-  ok:null,
-  async test(){
-    const probe="__planner_probe";
-    if(typeof window.storage!=="undefined"&&window.storage){
-      try{await window.storage.set(probe,"1");const r=await window.storage.get(probe);
-        if(r&&r.value==="1"){this.ok="cloud";return this.ok}}catch(e){}
-    }
-    try{localStorage.setItem(probe,"1");
-      if(localStorage.getItem(probe)==="1"){localStorage.removeItem(probe);this.ok="local";return this.ok}}catch(e){}
-    this.ok=false;return false;
-  },
-  async get(k){
-    if(typeof window.storage!=="undefined"&&window.storage){try{const r=await window.storage.get(k);if(r&&r.value)return r}catch(e){}}
-    try{const v=localStorage.getItem(k);return v?{value:v}:null}catch(e){return null}
-  },
-  async set(k,v){
-    let done=false;
-    if(typeof window.storage!=="undefined"&&window.storage){try{await window.storage.set(k,v);done=true}catch(e){}}
-    try{localStorage.setItem(k,v);done=true}catch(e){}
-    return done;
-  }
-};
+/* ---------- Supabase sync ---------- */
+async function loadFromDB(){
+  if(!user)return null;
+  const{data,error}=await sb.from("planner_data").select("data").eq("user_id",user.id).maybeSingle();
+  if(error||!data)return null;
+  return data.data;
+}
+async function saveToDB(){
+  if(!user||!S)return;
+  await sb.from("planner_data").upsert({user_id:user.id,data:S},{onConflict:"user_id"});
+}
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveToDB,600)}
 
-/* ---------- seed (only on a truly empty install) ---------- */
-const daily=()=>[
-  task("Челлендж по финансам — ролик дня",20,"hi","hi",{t:"Обязательно сейчас",c:"b-red"},
-    [sub("Придумать озвучку",1),sub("Озвучить",1),sub("Смонтировать",3),sub("Выложить",1)],false,"s_ch"),
-  task("Финансы понемногу",12,"hi","mid",{t:"Каждый день",c:"b-blue"},[sub("Теория",1),sub("Задачи",1)],false,"s_fin"),
-  task("Проверить кабинеты по таргету",8,"hi","hi",{t:"Каждый день",c:"b-blue"},[sub("Пройтись по всем кабинетам",1)],false,"s_tgt"),
-  task("Чекать визовый центр Испании",8,"mid","hi",{t:"Каждый день",c:"b-blue"},
-    [sub("Chrome 1",1),sub("Chrome 2",1),sub("Chrome 3",1),sub("Яндекс 1",1),sub("Яндекс 2",1),sub("Яндекс 3",1),
-     sub("Edge 1",1),sub("Edge 2",1),sub("Edge 3",1),sub("Safari 1",1),sub("Safari 2",1),sub("Safari 3",1)],true,"s_visa")
-];
-const newQuota=()=>[{id:"ob",n:"Обычные",goal:2,done:0,moved:0,extra:0},
-  {id:"rz",n:"Разговорные",goal:3,done:0,moved:0,extra:0},{id:"ch",n:"Челлендж",goal:1,done:0,moved:0,extra:0}];
-
-/* ---------- repeat rules (Google-Calendar style) ---------- */
+/* ---------- state ---------- */
 const defaultRules=()=>[
-  {id:uid(),qid:"ob",n:"Обычные",amount:2,mode:"weekdays",days:[1,3,5],on:2,off:2,every:2,start:"2026-08-10"},
-  {id:uid(),qid:"ob",n:"Обычные",amount:3,mode:"weekdays",days:[2,4,6,0],on:2,off:2,every:2,start:"2026-08-10"},
-  {id:uid(),qid:"rz",n:"Разговорные",amount:3,mode:"weekdays",days:[1,3,5,0],on:2,off:2,every:2,start:"2026-08-10"},
-  {id:uid(),qid:"ch",n:"Челлендж",amount:1,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:"2026-08-10"}
+  {id:uid(),qid:"ob",n:"Обычные ролики",amount:2,mode:"weekdays",days:[1,3,5],on:2,off:2,every:2,start:todayKey()},
+  {id:uid(),qid:"ob",n:"Обычные ролики",amount:3,mode:"weekdays",days:[2,4,6,0],on:2,off:2,every:2,start:todayKey()},
+  {id:uid(),qid:"rz",n:"Разговорные ролики",amount:3,mode:"weekdays",days:[1,3,5,0],on:2,off:2,every:2,start:todayKey()},
+  {id:uid(),qid:"ch",n:"Челлендж",amount:1,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()}
 ];
-function ruleHits(r,k){
-  if(r.mode==="daily")return true;
-  if(r.mode==="weekdays")return (r.days||[]).includes(dateOf(k).getDay());
-  const n=daysBetween(r.start||k,k);
-  if(r.mode==="cycle"){const len=Math.max(1,(+r.on||1)+(+r.off||0));
-    return (((n%len)+len)%len)<(+r.on||1)}
-  if(r.mode==="everyN"){const e=Math.max(1,+r.every||1);return (((n%e)+e)%e)===0}
-  return false;
-}
-function goalFor(qid,k){
-  return (S.rules||[]).filter(r=>r.qid===qid&&ruleHits(r,k))
-    .reduce((a,r)=>a+Math.max(0,+r.amount||0),0);
-}
-function applyRules(k,d){
-  const ids=[...new Set((S.rules||[]).map(r=>r.qid))];
-  ids.forEach(qid=>{
-    const rule=(S.rules||[]).find(r=>r.qid===qid);
-    let q=d.quota.find(x=>x.id===qid);
-    if(!q){q={id:qid,n:rule.n,goal:0,done:0,moved:0,extra:0};d.quota.push(q)}
-    q.n=rule.n;
-    if(!q.manual)q.goal=goalFor(qid,k);
-  });
-}
-/* a quota row is shown only if something is actually required or already done */
-const quotaVisible=q=>need(q)>0||q.done>0;
 function seed(){
-  return {days:{},bonus:[
-    {id:uid(),n:"Скачать видео для монтажа (домашка курса)",star:false,due:null,doneOn:null},
-    {id:uid(),n:"Посмотреть новые уроки по монтажу",star:false,due:null,doneOn:null},
-    {id:uid(),n:"Съездить на море, если погода хорошая",star:true,due:null,doneOn:null}
-  ],profile:{onboarded:false,goals:[],joys:[],about:"",lastAsk:null,dreamShown:null},carries:[],rules:defaultRules()};
+  return{days:{},bonus:[
+    {id:uid(),n:"Скачать видео для монтажа",star:false,due:null,doneOn:null},
+    {id:uid(),n:"Посмотреть уроки по монтажу",star:false,due:null,doneOn:null},
+    {id:uid(),n:"Съездить на море",star:true,due:null,doneOn:null}
+  ],archive:[],socials:[
+    {id:uid(),name:"YouTube",handle:"soweru",color:"#FF0000",entries:[]},
+    {id:uid(),name:"TikTok",handle:"soweru",color:"#000",entries:[]},
+    {id:uid(),name:"Telegram",handle:"soweru",color:"#229ED9",entries:[]},
+    {id:uid(),name:"Instagram",handle:"soweru",color:"#E1306C",entries:[]}
+  ],profile:{onboarded:false,goals:[],joys:[],about:"",lastAsk:null,dreamShown:null,dreamHidden:null},
+  carries:[],rules:defaultRules(),weekStart:null};
 }
-
-/* ---------- migration from earlier versions ---------- */
 function migrate(o){
   if(!o||typeof o!=="object")return seed();
-  const s={days:o.days||{},bonus:[],carries:o.carries||[],rules:o.rules||defaultRules(),
-    profile:{onboarded:false,goals:[],joys:[],about:"",lastAsk:null,dreamShown:null}};
+  const s=seed();
+  s.days=o.days||{};
+  s.carries=o.carries||[];
+  s.rules=o.rules||defaultRules();
+  s.archive=o.archive||[];
+  s.socials=o.socials||s.socials;
+  s.weekStart=o.weekStart||null;
+  if(o.bonus&&Array.isArray(o.bonus)){
+    s.bonus=o.bonus.map(b=>({id:b.id||uid(),n:(b.n||"").replace(/^★\s*/,""),star:b.star||/^★/.test(b.n||""),due:b.due||null,doneOn:b.doneOn||null}));
+  }
   const p=o.profile||{};
   s.profile.onboarded=!!p.onboarded;
   s.profile.joys=Array.isArray(p.joys)?p.joys:[];
   s.profile.about=p.about||"";
   s.profile.lastAsk=p.lastAsk||null;
+  s.profile.dreamShown=p.dreamShown||null;
+  s.profile.dreamHidden=p.dreamHidden||null;
   if(Array.isArray(p.goals))s.profile.goals=p.goals.map(g=>typeof g==="string"?{id:uid(),t:g,dream:false}:g);
   else if(typeof p.goals==="string"&&p.goals.trim())
-    s.profile.goals=p.goals.split(/[,\n;]+/).map(t=>t.trim()).filter(Boolean).map(t=>({id:uid(),t:t,dream:false}));
+    s.profile.goals=p.goals.split(/[,\n;]+/).map(t=>t.trim()).filter(Boolean).map(t=>({id:uid(),t,dream:false}));
   if(s.profile.goals.length&&!s.profile.goals.some(g=>g.dream))s.profile.goals[0].dream=true;
-
-  // old per-day bonus arrays -> one global list, completion pinned to its day
-  const seen={};
   Object.keys(s.days).forEach(k=>{
     const d=s.days[k];
-    (d.quota||[]).forEach(q=>{q.moved=q.moved||0;q.extra=q.extra||0});
-    if(Array.isArray(d.bonus)){
-      d.bonus.forEach(b=>{
-        const name=String(b.n||"").replace(/^★\s*/,"").trim();
-        if(!name)return;
-        if(b.done){s.bonus.push({id:uid(),n:name,star:/^★/.test(b.n||""),due:null,doneOn:k});return}
-        if(seen[name.toLowerCase()])return;
-        seen[name.toLowerCase()]=1;
-        s.bonus.push({id:uid(),n:name,star:/^★/.test(b.n||""),due:null,doneOn:null});
-      });
-      delete d.bonus;
-    }
+    if(Array.isArray(d.bonus)){delete d.bonus}
+    (d.quota||[]).forEach(q=>{q.moved=q.moved||0;q.extra=q.extra||0;q.skipped=q.skipped||0});
     (d.tasks||[]).forEach(t=>{if(!("sid" in t))t.sid=null});
   });
-  if(!s.bonus.length)s.bonus=seed().bonus;
   return s;
 }
 
-async function load(){
-  await store.test();
-  let raw=null;
-  try{const r=await store.get(KEY);raw=r&&r.value?JSON.parse(r.value):null}catch(e){}
-  S=raw?migrate(raw):seed();
-  sel=todayKey();
-  render();
-  if(store.ok===false){storageWarning();return}
-  maybeWeeklyAsk();dreamPing();
+/* ---------- repeat rules ---------- */
+function ruleHits(r,k){
+  if(r.mode==="daily")return true;
+  if(r.mode==="weekdays")return(r.days||[]).includes(dateOf(k).getDay());
+  const n=daysBetween(r.start||k,k);
+  if(r.mode==="cycle"){const len=Math.max(1,(+r.on||1)+(+r.off||0));return(((n%len)+len)%len)<(+r.on||1)}
+  if(r.mode==="everyN"){const e=Math.max(1,+r.every||1);return(((n%e)+e)%e)===0}
+  return false;
 }
-function storageWarning(){
-  openModal('<h3 style="color:var(--red)">Браузер не даёт сохранять данные</h3>'+
-    '<p class="lead">Этот браузер запретил файлу хранить данные, поэтому всё, что ты отметишь, пропадёт при перезагрузке страницы. Именно так потерялась прошлая неделя — тогда приложение об этом молчало.</p>'+
-    '<p class="lead"><b>Что помогает:</b> открыть планер в Chrome вместо Safari — там локальные файлы обычно сохраняют нормально. Либо после каждой сессии заходить в «данные», копировать резервную строку и хранить её в заметках.</p>'+
-    '<p class="lead">Пока эта плашка появляется при запуске, работать можно, но только в пределах одной вкладки: не перезагружай её.</p>'+
-    '<div class="acts"><button class="go" data-x>Понятно</button></div>');
+function goalFor(qid,k){return(S.rules||[]).filter(r=>r.qid===qid&&ruleHits(r,k)).reduce((a,r)=>a+Math.max(0,+r.amount||0),0)}
+function applyRules(k,d){
+  const ids=[...new Set((S.rules||[]).map(r=>r.qid))];
+  ids.forEach(qid=>{
+    const rule=(S.rules||[]).find(r=>r.qid===qid);if(!rule)return;
+    let q=d.quota.find(x=>x.id===qid);
+    if(!q){q={id:qid,n:rule.n,goal:0,done:0,moved:0,extra:0,skipped:0};d.quota.push(q)}
+    q.n=rule.n;
+    if(!q.manual)q.goal=goalFor(qid,k);
+  });
 }
-let st,warned=false;
-function save(){clearTimeout(st);st=setTimeout(async()=>{
-  const ok=await store.set(KEY,JSON.stringify(S));
-  if(!ok&&!warned){warned=true;toast("Внимание: браузер не сохраняет данные. Зайди в «данные» и скопируй резервную строку, иначе всё пропадёт при перезагрузке.")}
-},250)}
+const need=q=>Math.max(0,(+q.goal||0)-(q.moved||0)+(q.extra||0)-(q.skipped||0));
+const quotaVisible=q=>need(q)>0||q.done>0;
 
+function daily(){
+  return[
+    task("Разговорные ролики",15,"hi","hi",{t:"Обязательно сейчас",c:"b-red"},[sub("Смонтировать",2),sub("Выложить",1)],false,"s_rz"),
+    task("Обычные ролики",12,"hi","hi",null,[sub("Нарезка",1),sub("Озвучка",1),sub("Выложить",0.5)],false,"s_ob"),
+    task("Челлендж — ролик дня",18,"hi","hi",{t:"Обязательно сейчас",c:"b-red"},[sub("Озвучить",1),sub("Смонтировать",3),sub("Выложить",1)],false,"s_ch"),
+    task("Финансы понемногу",10,"hi","mid",{t:"Каждый день",c:"b-blue"},[sub("Теория",1),sub("Задачи",1)],false,"s_fin"),
+    task("Проверить кабинеты по таргету",8,"hi","hi",{t:"Каждый день",c:"b-blue"},[sub("Все кабинеты",1)],false,"s_tgt"),
+  ];
+}
+const newQuota=()=>[];
 function day(k){
-  if(!S.days[k])S.days[k]={tasks:daily(),quota:[]};
+  if(!S.days[k])S.days[k]={tasks:daily(),quota:newQuota()};
   const d=S.days[k];
   if(!d.tasks)d.tasks=[];
   if(!d.quota)d.quota=[];
-  d.quota.forEach(q=>{q.moved=q.moved||0;q.extra=q.extra||0});
+  d.quota.forEach(q=>{q.moved=q.moved||0;q.extra=q.extra||0;q.skipped=q.skipped||0});
   applyRules(k,d);
   return d;
 }
 const planned=k=>day(k).tasks.reduce((a,t)=>a+(+t.w||0),0);
-const need=q=>Math.max(0,(+q.goal||0)-(q.moved||0)+(q.extra||0));
-function prog(t){const tot=t.subs.reduce((a,s)=>a+(+s.u||0),0)||1;
-  return t.subs.reduce((a,s)=>a+(s.done?(+s.u||0):0),0)/tot*100}
+function prog(t){const tot=t.subs.reduce((a,s)=>a+(+s.u||0),0)||1;return t.subs.reduce((a,s)=>a+(s.done?+s.u:0),0)/tot*100}
+
+/* ---------- weekly reset ---------- */
+function maybeWeeklyReset(){
+  const tk=todayKey(),d=dateOf(tk),dow=d.getDay();
+  const mon=shift(tk,-((dow+6)%7));
+  if(S.weekStart===mon)return;
+  S.weekStart=mon;
+  // clear skipped debts from previous weeks
+  Object.keys(S.days).forEach(k=>{
+    if(k<mon)(S.days[k].quota||[]).forEach(q=>q.skipped=q.extra=q.moved=0);
+  });
+}
+
+/* ---------- AUTH ---------- */
+async function initAuth(){
+  const{data:{session}}=await sb.auth.getSession();
+  if(session){await startApp(session.user);return}
+  sb.auth.onAuthStateChange(async(_ev,sess)=>{
+    if(sess)await startApp(sess.user);
+    else showAuth();
+  });
+  showAuth();
+}
+function showAuth(){document.getElementById("authWrap").style.display="flex";document.getElementById("appWrap").classList.remove("on")}
+async function startApp(u){
+  user=u;
+  document.getElementById("authWrap").style.display="none";
+  document.getElementById("appWrap").classList.add("on");
+  document.getElementById("userbtn").textContent=u.email.split("@")[0]+" →";
+  let raw=await loadFromDB();
+  if(!raw){try{const v=localStorage.getItem(KEY);if(v)raw=JSON.parse(v)}catch(e){}}
+  S=raw?migrate(raw):seed();
+  sel=todayKey();
+  maybeWeeklyReset();
+  render();
+  if(!S.profile.onboarded)goalsModal(true);
+  else maybeWeeklyAsk();
+}
+let authMode="login";
+document.getElementById("tabLogin").onclick=()=>{authMode="login";document.getElementById("tabLogin").classList.add("on");document.getElementById("tabReg").classList.remove("on");document.getElementById("aPass2wrap").style.display="none";document.getElementById("aBtn").textContent="Войти";document.getElementById("aErr").classList.remove("on")};
+document.getElementById("tabReg").onclick=()=>{authMode="reg";document.getElementById("tabReg").classList.add("on");document.getElementById("tabLogin").classList.remove("on");document.getElementById("aPass2wrap").style.display="block";document.getElementById("aBtn").textContent="Создать аккаунт";document.getElementById("aErr").classList.remove("on")};
+document.getElementById("aBtn").onclick=async()=>{
+  const email=document.getElementById("aEmail").value.trim();
+  const pass=document.getElementById("aPass").value;
+  const errEl=document.getElementById("aErr");
+  errEl.classList.remove("on");
+  if(!email||!pass){errEl.textContent="Заполни почту и пароль";errEl.classList.add("on");return}
+  document.getElementById("aBtn").disabled=true;
+  if(authMode==="reg"){
+    const pass2=document.getElementById("aPass2").value;
+    if(pass!==pass2){errEl.textContent="Пароли не совпадают";errEl.classList.add("on");document.getElementById("aBtn").disabled=false;return}
+    const{error}=await sb.auth.signUp({email,password:pass});
+    if(error){errEl.textContent=error.message;errEl.classList.add("on");document.getElementById("aBtn").disabled=false;return}
+    errEl.style.color="var(--green)";errEl.textContent="Проверь почту — мы отправили подтверждение";errEl.classList.add("on");
+  }else{
+    const{error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error){errEl.textContent="Неверная почта или пароль";errEl.classList.add("on");document.getElementById("aBtn").disabled=false;return}
+  }
+  document.getElementById("aBtn").disabled=false;
+};
+document.getElementById("aEmail").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("aPass").focus()});
+document.getElementById("aPass").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("aBtn").click()});
+document.getElementById("userbtn").onclick=()=>{
+  openModal('<h3>Аккаунт</h3><p class="lead">'+esc(user.email)+'</p>'+
+    '<div class="acts"><button data-x>Закрыть</button><button class="del" id="signout">Выйти из аккаунта</button></div>');
+  document.getElementById("signout").onclick=async()=>{await sb.auth.signOut();closeModal();showAuth()};
+};
 
 /* ---------- render ---------- */
 function render(){
@@ -366,32 +471,21 @@ function render(){
   document.getElementById("dt").textContent=human(sel);
   let earned=0;d.tasks.forEach(t=>earned+=t.w*prog(t)/100);
   const pct=P?Math.round(earned/P*100):0;
-  const b=document.getElementById("big");
-  b.textContent=pct+"%";b.style.color=pct>=100?"var(--green)":"var(--ink)";
-  document.getElementById("bigsub").textContent=
-    P===0?"на этот день пока ничего не запланировано":
-    pct>=100?"весь план дня закрыт":
-    "закрыто из плана дня · осталось "+fmt(P-earned)+" из "+P+" запланированных процентов";
-  document.getElementById("budget").innerHTML="Запланировано <b>"+P+"%</b>"+
-    (P>100?' <span class="over">· овер-планинг, это нормально: проценты показывают, какую долю плана ты закрыла</span>'
-      :P<100?" · свободно "+(100-P)+"%":"");
-
+  const b=document.getElementById("big");b.textContent=pct+"%";b.style.color=pct>=100?"var(--green)":"var(--ink)";
+  document.getElementById("bigsub").textContent=P===0?"На этот день задач нет":pct>=100?"День закрыт":"Выполнено "+fmt(earned)+" из "+P+"% запланированного";
+  document.getElementById("budget").innerHTML="Запланировано <b>"+P+"%</b>"+(P>100?" · овер-планинг, проценты покажут долю закрытого":P<100?" · свободно "+(100-P)+"%":"");
   const segs=document.getElementById("segs");segs.innerHTML="";
-  d.tasks.forEach(t=>{const p=prog(t),e=document.createElement("div");
-    e.className="seg"+(p>=100?" done":"");e.style.flexGrow=t.w;e.title=t.n+" — "+t.w+"%";
-    e.innerHTML='<i style="width:'+p+'%"></i>';segs.appendChild(e)});
+  d.tasks.forEach(t=>{const p=prog(t),e=document.createElement("div");e.className="seg"+(p>=100?" done":"");e.style.flexGrow=t.w;e.innerHTML='<i style="width:'+p+'%"></i>';segs.appendChild(e)});
   if(P<100){const f=document.createElement("div");f.className="seg free";f.style.flexGrow=100-P;segs.appendChild(f)}
-
-  renderDream();renderWeek();renderTasks();renderBonus();
+  renderDream();renderWeek();renderWeekStats();renderTasks();renderBonus();renderSocials();
 }
 
 function renderDream(){
   const box=document.getElementById("dreambox");
   const dream=S.profile.goals.find(g=>g.dream);
   if(!dream||S.profile.dreamHidden===todayKey()){box.innerHTML="";return}
-  box.innerHTML='<div class="dream"><span>✦</span><div>Не забывай, ради чего всё это: <b>'+esc(dream.t)+'</b></div>'+
-    '<button title="Скрыть на сегодня">×</button></div>';
-  box.querySelector("button").onclick=()=>{S.profile.dreamHidden=todayKey();save();renderDream()};
+  box.innerHTML='<div class="dream"><span>✦</span><div>Ради чего всё: <b>'+esc(dream.t)+'</b></div><button>×</button></div>';
+  box.querySelector("button").onclick=()=>{S.profile.dreamHidden=todayKey();scheduleSave();renderDream()};
 }
 
 function renderWeek(){
@@ -404,32 +498,65 @@ function renderWeek(){
     const late=!ok&&vis.length>0&&k<TK;
     const el=document.createElement("div");
     el.className="wd"+(k===sel?" sel":"")+(ok?" ok":late?" late":"");
-    const hd=document.createElement("div");hd.className="dname";
-    hd.innerHTML="<span>"+SHORT[dt.getDay()]+" "+dt.getDate()+"</span>"+
-      (ok?'<span style="color:var(--green)">✓</span>':'')+'<button class="pen">✎</button>';
-    hd.querySelector(".pen").onclick=ev=>{ev.stopPropagation();quotaModal(k)};
-    el.appendChild(hd);
+    const dn=document.createElement("div");dn.className="dn";
+    dn.innerHTML="<span>"+SHORT[dt.getDay()]+" "+dt.getDate()+"</span>"+(ok?"<span style='color:var(--green)'>✓</span>":"");
+    el.appendChild(dn);
     vis.forEach(q=>{
       const adj=(q.extra||0)-(q.moved||0);
       const r=document.createElement("div");r.className="q";
-      r.innerHTML='<button data-a="-">−</button><button data-a="+">+</button><span class="qn">'+esc(q.n)+
-        '</span><span class="qv'+(q.done>=need(q)?" ok":"")+'">'+q.done+"/"+q.goal+"</span>"+
-        (adj?'<span class="adj">'+(adj>0?"+":"")+adj+"</span>":"");
-      r.querySelectorAll("button").forEach(bt=>bt.onclick=ev=>{ev.stopPropagation();
-        q.done=Math.max(0,q.done+(bt.dataset.a==="+"?1:-1));save();render()});
+      r.innerHTML='<button data-a="-">−</button><button data-a="+">+</button><span class="qn">'+esc(q.n)+'</span><span class="qv'+(q.done>=need(q)?" ok":"")+'">'+q.done+"/"+q.goal+"</span>"+(adj?'<span class="adj">'+(adj>0?"+":"")+adj+"</span>":"");
+      r.querySelectorAll("button").forEach(bt=>bt.onclick=ev=>{ev.stopPropagation();q.done=Math.max(0,q.done+(bt.dataset.a==="+"?1:-1));scheduleSave();render()});
       el.appendChild(r);
     });
     if(vis.some(q=>q.done<need(q))){
-      const c=document.createElement("button");c.className="carry";c.textContent="Перенести невыполненное";
-      c.onclick=ev=>{ev.stopPropagation();carry(k)};el.appendChild(c);
-    }
-    if(S.carries.some(c=>c.from===k||c.to===k)){
-      const u=document.createElement("button");u.className="carry undo";u.textContent="Отменить перенос";
-      u.onclick=ev=>{ev.stopPropagation();undoCarry(k)};el.appendChild(u);
+      const c=document.createElement("button");c.className="carry";c.textContent="Перенести";
+      c.onclick=ev=>{ev.stopPropagation();carryModal(k)};el.appendChild(c);
+      const sk=document.createElement("button");sk.className="skip";sk.textContent="Забыть долг";
+      sk.onclick=ev=>{ev.stopPropagation();skipDebt(k)};el.appendChild(sk);
     }
     el.onclick=()=>{sel=k;render()};
     box.appendChild(el);
   }
+}
+
+function skipDebt(k){
+  const d=day(k),miss=d.quota.filter(q=>q.done<need(q));
+  miss.forEach(q=>q.skipped+=(need(q)-q.done));
+  scheduleSave();render();toast("Долг списан. В статистике за неделю учтётся исходный план.");
+}
+
+/* ---------- weekly stats ---------- */
+function statColor(pct){
+  if(pct>=90)return"#166534";
+  if(pct>=70)return"#15803d";
+  if(pct>=50)return"#22c55e";
+  if(pct>=30)return"#f59e0b";
+  if(pct>=15)return"#ef4444";
+  return"#9f1239";
+}
+function renderWeekStats(){
+  const box=document.getElementById("wstats");box.innerHTML="";
+  const dow=dateOf(sel).getDay(),start=shift(sel,-((dow+6)%7));
+  const ids=[...new Set((S.rules||[]).map(r=>r.qid))];
+  ids.forEach(qid=>{
+    const rule=(S.rules||[]).find(r=>r.qid===qid);if(!rule)return;
+    let totalGoal=0,totalDone=0;
+    for(let i=0;i<7;i++){
+      const k=shift(start,i),d=day(k);
+      const q=d.quota.find(x=>x.id===qid);
+      if(!q)continue;
+      totalGoal+=q.goal;
+      totalDone+=q.done;
+    }
+    if(!totalGoal)return;
+    const pct=Math.min(100,Math.round(totalDone/totalGoal*100));
+    const col=statColor(pct);
+    const el=document.createElement("div");el.className="wstat";
+    el.innerHTML='<div class="wsn">'+esc(rule.n)+' за неделю</div>'+
+      '<div class="wsv" style="color:'+col+'">'+totalDone+" / "+totalGoal+'</div>'+
+      '<div class="wsbar"><i style="width:'+pct+'%;background:'+col+'"></i></div>';
+    box.appendChild(el);
+  });
 }
 
 function renderTasks(){
@@ -437,531 +564,314 @@ function renderTasks(){
   const d=day(sel);
   d.tasks.forEach((t,idx)=>{
     const p=prog(t),tot=t.subs.reduce((a,s)=>a+(+s.u||0),0)||1;
-    const el=document.createElement("div");
-    el.className="task"+(p>=100?" done":"");el.draggable=true;
-    const impL=(IMP.find(x=>x[0]===t.imp)||["","—"])[1],urgL=(URG.find(x=>x[0]===t.urg)||["","—"])[1];
+    const allDone=p>=100;
+    const el=document.createElement("div");el.className="task"+(allDone?" done":"");el.draggable=true;
+    const impL=(IMP.find(x=>x[0]===t.imp)||["",""])[1];
+    const urgL=(URG.find(x=>x[0]===t.urg)||["",""])[1];
     el.innerHTML='<div class="thead"><span class="grip">⠿</span><div class="w">'+t.w+'%</div>'+
       '<div class="tname">'+esc(t.n)+'</div>'+
       (t.badge?'<span class="badge '+t.badge.c+'">'+esc(t.badge.t)+'</span>':'')+
-      '<div class="tools"><button data-e="up">↑</button><button data-e="dn">↓</button><button data-e="ed">✎</button></div></div>'+
-      '<div class="meta"><span>'+impL+'</span><span>'+urgL+'</span><span>'+Math.round(p)+'% выполнено</span></div>'+
+      '<input type="checkbox" class="tall-cb" title="Выполнить всё"'+(allDone?" checked":"")+'>'+ 
+      '<div class="tools"><button data-e="ed" title="Редактировать">✎</button><button data-e="del" title="Удалить">🗑</button></div></div>'+
+      '<div class="meta">'+(impL?"<span>"+impL+"</span>":"")+(urgL?"<span>"+urgL+"</span>":"")+
+      '<span>'+Math.round(p)+'% выполнено</span></div>'+
       '<div class="subs'+(t.grid?" grid":"")+'"></div>';
     const sc=el.querySelector(".subs");
     t.subs.forEach(s=>{
       const l=document.createElement("label");l.className="sub"+(s.done?" on":"");
-      l.innerHTML='<input type="checkbox"'+(s.done?" checked":"")+'><span class="txt">'+esc(s.n)+
-        '</span><span class="pct">'+fmt(t.w*s.u/tot)+'%</span>';
-      l.querySelector("input").onchange=e=>{s.done=e.target.checked;save();render()};
+      l.innerHTML='<input type="checkbox"'+(s.done?" checked":"")+'><span class="txt">'+esc(s.n)+'</span><span class="pct">'+fmt(t.w*s.u/tot)+'%</span>';
+      l.querySelector("input").onchange=e=>{s.done=e.target.checked;scheduleSave();render()};
       sc.appendChild(l);
     });
+    // master checkbox
+    el.querySelector(".tall-cb").onchange=e=>{t.subs.forEach(s=>s.done=e.target.checked);scheduleSave();render()};
     el.querySelector('[data-e="ed"]').onclick=()=>taskModal(t);
-    el.querySelector('[data-e="up"]').onclick=()=>{if(idx>0){d.tasks.splice(idx-1,0,d.tasks.splice(idx,1)[0]);save();render()}};
-    el.querySelector('[data-e="dn"]').onclick=()=>{if(idx<d.tasks.length-1){d.tasks.splice(idx+1,0,d.tasks.splice(idx,1)[0]);save();render()}};
-    el.ondragstart=()=>{dragId=t.id;el.classList.add("drag")};
-    el.ondragend=()=>{el.classList.remove("drag");document.querySelectorAll(".task").forEach(x=>x.classList.remove("over"))};
-    el.ondragover=e=>{e.preventDefault();el.classList.add("over")};
-    el.ondragleave=()=>el.classList.remove("over");
-    el.ondrop=e=>{e.preventDefault();const from=d.tasks.findIndex(x=>x.id===dragId),to=d.tasks.findIndex(x=>x.id===t.id);
-      if(from>-1&&to>-1&&from!==to){d.tasks.splice(to,0,d.tasks.splice(from,1)[0]);save();render()}};
+    el.querySelector('[data-e="del"]').onclick=()=>deleteModal(t);
+    // drag
+    el.ondragstart=()=>{dragId=t.id;el.style.opacity=".4"};
+    el.ondragend=()=>{el.style.opacity="";document.querySelectorAll(".task").forEach(x=>x.classList.remove("drag-over"))};
+    el.ondragover=e=>{e.preventDefault();el.classList.add("drag-over")};
+    el.ondragleave=()=>el.classList.remove("drag-over");
+    el.ondrop=e=>{e.preventDefault();const from=d.tasks.findIndex(x=>x.id===dragId),to=d.tasks.findIndex(x=>x.id===t.id);if(from>-1&&to>-1&&from!==to){d.tasks.splice(to,0,d.tasks.splice(from,1)[0]);scheduleSave();render()}};
     box.appendChild(el);
   });
 }
 
-/* ---------- bonus: one global list, completion pinned to a day ---------- */
-function visibleBonus(k){return S.bonus.filter(b=>!b.doneOn||b.doneOn===k)}
-function dueLabel(b,k){
-  if(!b.due)return"";
-  const n=daysBetween(k,b.due);
-  if(n<0)return['<span class="due over">просрочено · было до '+shortHuman(b.due)+"</span>"];
-  if(n===0)return['<span class="due soon">сегодня последний день</span>'];
-  if(n<=3)return['<span class="due soon">до '+shortHuman(b.due)+" · осталось "+n+(n===1?" день":n<5?" дня":" дней")+"</span>"];
-  return['<span class="due">до '+shortHuman(b.due)+"</span>"];
-}
 function renderBonus(){
   const ul=document.getElementById("bonus");ul.innerHTML="";
-  const list=visibleBonus(sel);
+  const list=S.bonus.filter(b=>!b.doneOn||b.doneOn===sel);
   const done=list.filter(b=>b.doneOn===sel).length,total=list.length||1;
-  list.slice().sort((a,b)=>(a.due?dateOf(a.due):9e15)-(b.due?dateOf(b.due):9e15)).forEach(b=>{
-    const li=document.createElement("li");
+  list.sort((a,b2)=>(a.due?dateOf(a.due):9e15)-(b2.due?dateOf(b2.due):9e15)).forEach(b=>{
     const on=b.doneOn===sel;
-    li.innerHTML='<label class="'+(on?"on":"")+'"><input type="checkbox"'+(on?" checked":"")+
-      '><span class="bt'+(b.star?" star":"")+'">'+(b.star?"★ ":"")+esc(b.n)+dueLabel(b,sel)+
-      '</span></label>';
-    const lb=li.querySelector("label");
-    const ed=document.createElement("button");ed.className="ed";ed.textContent="✎";
-    ed.onclick=e=>{e.preventDefault();e.stopPropagation();bonusModal(b)};
-    lb.appendChild(ed);
-    li.querySelector("input").onchange=e=>{
-      b.doneOn=e.target.checked?sel:null;
-      if(e.target.checked)reward(visibleBonus(sel).filter(x=>x.doneOn===sel).length);
-      save();render()};
+    const li=document.createElement("li");
+    const daysLeft=b.due?daysBetween(todayKey(),b.due):null;
+    const dueHtml=b.due?'<span class="due'+(daysLeft<0?" over":daysLeft<=3?" soon":"")+'">'+
+      (daysLeft<0?"просрочено":daysLeft===0?"сегодня последний день":"до "+shortHuman(b.due))+'</span>':"";
+    li.innerHTML='<label class="'+(on?"on":"")+'"><input type="checkbox"'+(on?" checked":"")+'><span class="bt'+(b.star?" star":"")+'">'+(b.star?"★ ":"")+esc(b.n)+dueHtml+'</span></label>';
+    const lb=li.querySelector("label"),ed=document.createElement("button");ed.className="ed";ed.textContent="✎";
+    ed.onclick=e=>{e.preventDefault();bonusModal(b)};lb.appendChild(ed);
+    li.querySelector("input").onchange=e=>{b.doneOn=e.target.checked?sel:null;if(e.target.checked)reward(list.filter(x=>x.doneOn===sel).length);scheduleSave();render()};
     ul.appendChild(li);
   });
-  const r=44,c=2*Math.PI*r,off=c*(1-done/total);
+  const r=40,c=2*Math.PI*r,off=c*(1-done/total);
   document.getElementById("donut").innerHTML=
-    '<circle cx="56" cy="56" r="'+r+'" fill="none" stroke="#e3e7ef" stroke-width="14"/>'+
-    '<circle cx="56" cy="56" r="'+r+'" fill="none" stroke="var(--green)" stroke-width="14" stroke-linecap="round"'+
-    ' stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 56 56)"/>'+
-    '<text x="56" y="62" text-anchor="middle" font-size="22" font-weight="600" fill="var(--ink)">'+done+"</text>";
-  document.getElementById("bonustxt").innerHTML="<b>"+done+" за этот день</b><br>Список общий: закрытое исчезает из следующих дней, но остаётся в том, где ты его отметила.";
+    '<circle cx="56" cy="56" r="'+r+'" fill="none" stroke="#e3e7ef" stroke-width="13"/>'+
+    '<circle cx="56" cy="56" r="'+r+'" fill="none" stroke="var(--green)" stroke-width="13" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 56 56)"/>'+
+    '<text x="56" y="62" text-anchor="middle" font-size="21" font-weight="600" fill="var(--ink)" font-family="'+getComputedStyle(document.documentElement).getPropertyValue("--mono")+'">'+done+"</text>";
+  document.getElementById("bonustxt").innerHTML="<b>"+done+" за этот день</b><br><span style='font-size:12px'>Список общий — закрытые исчезают из следующих дней</span>";
 }
 
-function bonusModal(b){
-  const isNew=!b;
-  const d=b||{id:uid(),n:"",star:false,due:null,doneOn:null};
-  openModal('<h3>'+(isNew?"Необязательная задача":"Изменить задачу")+'</h3>'+
-    '<p class="lead">Такие задачи не занимают проценты дня — они сверх плана. Дедлайн нужен, чтобы они не висели вечно, но и не давили каждый день.</p>'+
-    '<div class="f"><label>Что нужно сделать</label><input type="text" id="bn" value="'+esc(d.n)+'" placeholder="Например: посмотреть урок по монтажу"></div>'+
-    '<div class="f"><label>Дедлайн</label><div class="chips" id="dch">'+
-      '<button class="chip" data-d="7">На этой неделе</button><button class="chip" data-d="14">На следующей</button>'+
-      '<button class="chip" data-d="30">В этом месяце</button><button class="chip" data-d="">Без срока</button></div>'+
-      '<input type="date" id="bd" style="margin-top:10px" value="'+(d.due||"")+'"></div>'+
-    '<div class="f"><label>Пометка</label><div class="chips"><button class="chip'+(d.star?" on":"")+'" id="stb">★ Отметить звёздочкой</button></div>'+
-      '<div class="hint">Звёздочка красит задачу жёлтым — для того, что делаешь для себя, а не по плану.</div></div>'+
-    '<div class="acts">'+(isNew?"":'<button class="del" id="bdel">Удалить</button>')+
-    '<button data-x>Отмена</button><button class="go" id="bgo">'+(isNew?"Добавить":"Сохранить")+'</button></div>');
-  let star=d.star;
-  document.getElementById("stb").onclick=e=>{star=!star;e.target.classList.toggle("on",star)};
-  document.querySelectorAll("#dch .chip").forEach(c=>c.onclick=()=>{
-    document.getElementById("bd").value=c.dataset.d?shift(todayKey(),+c.dataset.d):""});
-  if(!isNew)document.getElementById("bdel").onclick=()=>{
-    S.bonus=S.bonus.filter(x=>x.id!==b.id);closeModal();save();render()};
-  document.getElementById("bgo").onclick=()=>{
-    const n=document.getElementById("bn").value.trim();if(!n){closeModal();return}
-    d.n=n;d.star=star;d.due=document.getElementById("bd").value||null;
-    if(isNew)S.bonus.push(d);
-    closeModal();save();render()};
-}
-document.getElementById("addbonus").onclick=()=>bonusModal(null);
-
-/* ---------- quota ---------- */
-function quotaModal(k){
-  const d=day(k);
-  const draw=()=>{
-    openModal('<h3>План на '+human(k).toLowerCase()+'</h3>'+
-      '<p class="lead">Обычно эти числа приходят из повторов (кнопка «повторы» вверху). Здесь можно переписать план только для этого дня. Изменённое вручную помечается и больше не подчиняется повтору, пока не вернёшь через ↺. Нули не показываются в календаре — строка появится, если что-то перенесут на этот день.</p>'+
-      '<div id="ql">'+d.quota.map((q,i)=>'<div class="subrow"><input type="text" data-n="'+i+'" value="'+esc(q.n)+'">'+
-        '<input type="number" data-g="'+i+'" min="0" value="'+q.goal+'" style="width:80px">'+
-        (q.manual?'<button data-rst="'+i+'" title="Вернуть к ритму">↺</button>':"")+
-        '<button data-rm="'+i+'">×</button></div>').join("")+"</div>"+
-      '<div class="hint">↺ вернёт значение к тому, что задано повтором.</div>'+
-      '<button class="smalladd" id="qadd" style="width:auto;padding:9px 16px">+ показатель только на этот день</button>'+
-      '<div class="acts"><button class="go" data-x>Готово</button></div>');
-    document.querySelectorAll("#ql [data-n]").forEach(el=>el.oninput=e=>{d.quota[+el.dataset.n].n=e.target.value;save()});
-    document.querySelectorAll("#ql [data-g]").forEach(el=>el.oninput=e=>{
-      const q=d.quota[+el.dataset.g];q.goal=Math.max(0,+e.target.value||0);q.manual=true;save();renderWeek()});
-    document.querySelectorAll("#ql [data-rst]").forEach(el=>el.onclick=()=>{
-      delete d.quota[+el.dataset.rst].manual;save();render();draw()});
-    document.querySelectorAll("#ql [data-rm]").forEach(el=>el.onclick=()=>{d.quota.splice(+el.dataset.rm,1);save();render();draw()});
-    document.getElementById("qadd").onclick=()=>{d.quota.push({id:uid(),n:"Новый показатель",goal:1,done:0,moved:0,extra:0,manual:true});save();render();draw()};
-  };
-  draw();
+function renderSocials(){
+  const box=document.getElementById("socials");box.innerHTML="";
+  (S.socials||[]).forEach(soc=>{
+    const entries=soc.entries||[];
+    const last=entries[entries.length-1];
+    const prev=entries[entries.length-2];
+    const val=last?last.v:null;
+    const delta=last&&prev?last.v-prev.v:null;
+    const el=document.createElement("div");el.className="soc";
+    el.innerHTML='<div class="sname">'+esc(soc.name)+'</div>'+
+      '<div class="sval">'+(val!=null?val.toLocaleString("ru"):"—")+'</div>'+
+      '<div class="sdelta '+(delta==null?"same":delta>0?"up":"dn")+'">'+(delta==null?"обновлений нет":delta>0?"+"+delta.toLocaleString("ru"):delta.toLocaleString("ru"))+'</div>'+
+      '<input class="sedit" type="number" placeholder="Новое число" min="0">';
+    el.querySelector(".sedit").onchange=e=>{
+      const v=+e.target.value;if(isNaN(v)||v<0)return;
+      soc.entries=soc.entries||[];soc.entries.push({d:todayKey(),v});
+      if(soc.entries.length>90)soc.entries=soc.entries.slice(-90);
+      e.target.value="";scheduleSave();render();toast(soc.name+" обновлён: "+v.toLocaleString("ru"))};
+    box.appendChild(el);
+  });
+  const add=document.createElement("button");add.className="soc-add";add.textContent="+ Добавить соцсеть";
+  add.onclick=()=>socialModal(null);box.appendChild(add);
 }
 
-/* ---------- carry ---------- */
-function carry(k){
-  const d=day(k),miss=d.quota.filter(q=>quotaVisible(q)&&q.done<need(q));
-  openModal('<h3>Перенести невыполненное</h3>'+
-    '<p class="lead">Не закрыто: '+miss.map(q=>(need(q)-q.done)+" "+q.n.toLowerCase()).join(", ")+
-    '. План дня останется прежним — рядом появится пометка со сдвигом. Этот день закроется, а у выбранного норма вырастет. Перенос всегда можно отменить.</p>'+
-    '<div class="f"><label>Перенести на</label><input type="date" id="cdate" value="'+shift(k,1)+'"></div>'+
-    '<div class="acts"><button data-x>Отмена</button><button class="go" id="cgo">Перенести</button></div>');
-  document.getElementById("cgo").onclick=()=>{
-    const to=document.getElementById("cdate").value;if(!to||to===k)return;
-    const t=day(to);
-    miss.forEach(q=>{const left=need(q)-q.done;q.moved+=left;
-      let tq=t.quota.find(x=>x.id===q.id);
-      if(tq)tq.extra+=left;else t.quota.push({id:q.id,n:q.n,goal:0,done:0,moved:0,extra:left});
-      S.carries.push({id:uid(),from:k,to:to,qid:q.id,n:q.n,amount:left})});
-    closeModal();save();render();
-    toast("Перенесено. "+SHORT[dateOf(k).getDay()]+" закрыт, у "+SHORT[dateOf(to).getDay()]+" норма выросла.");
-  };
-}
-function undoCarry(k){
-  const list=S.carries.filter(c=>c.from===k||c.to===k);
-  openModal('<h3>Отменить перенос</h3>'+
-    '<p class="lead">Если ты на самом деле всё выложила и просто забыла отметить — верни норму на место.</p>'+
-    '<div id="clist">'+list.map(c=>'<div class="subrow"><span style="flex:1">'+c.amount+" "+esc(c.n.toLowerCase())+
-      " · "+SHORT[dateOf(c.from).getDay()]+" → "+SHORT[dateOf(c.to).getDay()]+
-      '</span><button data-c="'+c.id+'">вернуть</button></div>').join("")+"</div>"+
-    '<div class="acts"><button data-x>Закрыть</button></div>');
-  document.querySelectorAll("#clist button").forEach(b=>b.onclick=()=>{
-    const c=S.carries.find(x=>x.id===b.dataset.c);if(!c)return;
-    const f=day(c.from).quota.find(q=>q.id===c.qid),t=day(c.to).quota.find(q=>q.id===c.qid);
-    if(f)f.moved=Math.max(0,f.moved-c.amount);
-    if(t)t.extra=Math.max(0,t.extra-c.amount);
-    S.carries=S.carries.filter(x=>x.id!==c.id);
-    closeModal();save();render();toast("Перенос отменён, норма вернулась на место.")});
+function socialModal(soc){
+  const isNew=!soc;
+  const d=soc||{id:uid(),name:"",handle:"",color:"#2B44E0",entries:[]};
+  openModal('<h3>'+(isNew?"Новая соцсеть":"Редактировать")+'</h3>'+
+    '<div class="mf"><label>Название</label><input type="text" id="sn" value="'+esc(d.name)+'" placeholder="YouTube"></div>'+
+    '<div class="mf"><label>Цвет</label><input type="color" id="sc" value="'+(d.color||"#2B44E0")+'" style="height:40px;width:80px;padding:4px;border-radius:8px;border:1px solid var(--line)"></div>'+
+    '<div class="acts">'+(isNew?"":'<button class="del" id="sdel">Удалить</button>')+
+    '<button data-x>Отмена</button><button class="go" id="sgo">'+(isNew?"Добавить":"Сохранить")+'</button></div>');
+  if(!isNew)document.getElementById("sdel").onclick=()=>{S.socials=S.socials.filter(x=>x.id!==soc.id);closeModal();scheduleSave();render()};
+  document.getElementById("sgo").onclick=()=>{
+    d.name=document.getElementById("sn").value.trim()||"Соцсеть";
+    d.color=document.getElementById("sc").value;
+    if(isNew)S.socials.push(d);
+    closeModal();scheduleSave();render()};
 }
 
-/* ---------- modal ---------- */
-function openModal(html){document.getElementById("modal").innerHTML=html;
-  document.getElementById("mask").classList.add("on");
-  document.querySelectorAll("[data-x]").forEach(b=>b.onclick=closeModal)}
+/* ---------- modals ---------- */
+function openModal(html){document.getElementById("modal").innerHTML=html;document.getElementById("mask").classList.add("on");document.querySelectorAll("[data-x]").forEach(b=>b.onclick=closeModal)}
 function closeModal(){document.getElementById("mask").classList.remove("on")}
 document.getElementById("mask").onclick=e=>{if(e.target.id==="mask")closeModal()};
 
-/* ---------- task modal ---------- */
 function taskModal(t){
   const isNew=!t,d=day(sel);
-  let draft=isNew?{n:"",w:10,imp:null,urg:null,badge:null,subs:[sub("",1)],grid:false,sid:null}
-    :JSON.parse(JSON.stringify(t));
+  let draft=isNew?{n:"",w:10,imp:null,urg:null,badge:null,subs:[sub("",1)],grid:false,sid:null}:JSON.parse(JSON.stringify(t));
   let touched=!isNew;
-  openModal('<h3>'+(isNew?"Новая задача":"Редактировать задачу")+'</h3>'+
-    '<div class="f"><label>Задача</label><input type="text" id="tn" value="'+esc(draft.n)+'" placeholder="Что нужно сделать"></div>'+
-    '<div class="two"><div class="f"><label>Важность</label><div class="chips" id="imp">'+
-      IMP.map(x=>'<button class="chip'+(draft.imp===x[0]?" on":"")+'" data-v="'+x[0]+'">'+x[1]+"</button>").join("")+'</div></div>'+
-    '<div class="f"><label>Срочность</label><div class="chips" id="urg">'+
-      URG.map(x=>'<button class="chip'+(draft.urg===x[0]?" on":"")+'" data-v="'+x[0]+'">'+x[1]+"</button>").join("")+'</div></div></div>'+
-    '<div class="f"><label>Вес в дне</label><div class="range">'+
-      '<input type="range" id="wr" min="1" max="60" value="'+draft.w+'"><div class="val" id="wv">'+draft.w+'%</div></div>'+
-      '<div class="hint" id="wh"></div></div>'+
-    '<div class="f"><label>Плашка</label><div class="chips" id="bd">'+
-      BADGES.map((b,i)=>'<button class="chip'+(draft.badge&&draft.badge.t===b.t?" on":"")+'" data-i="'+i+'">'+b.t+"</button>").join("")+
-      '<button class="chip" data-i="own">+ своя</button><button class="chip" data-i="none">Без плашки</button></div>'+
-      '<input type="text" id="ownb" placeholder="Текст своей плашки" style="margin-top:10px;display:'+
-        (draft.badge&&!BADGES.some(b=>b.t===draft.badge.t)?"block":"none")+'" value="'+
-        (draft.badge&&!BADGES.some(b=>b.t===draft.badge.t)?esc(draft.badge.t):"")+'"></div>'+
-    '<div class="f"><label>Подпункты и их вес</label><div id="subs"></div>'+
-      '<button class="smalladd" id="addsub" style="width:auto;padding:9px 16px">+ подпункт</button>'+
-      '<div class="hint">Вес — в «единичках» по времени: обычный шаг = 1, вдвое длиннее = 2, чуть тяжелее = 1,5. Проценты внутри задачи считаются сами.</div></div>'+
-    (isNew?"":'<div class="f"><label>Перенести на другой день</label><input type="date" id="mv" value="'+sel+'"></div>')+
-    '<div class="acts">'+(isNew?"":'<button class="del" id="del">Удалить</button>')+
-    '<button data-x>Отмена</button><button class="go" id="go">'+(isNew?"Добавить":"Сохранить")+"</button></div>");
-
+  openModal('<h3>'+(isNew?"Новая задача":"Редактировать")+'</h3>'+
+    '<div class="mf"><label>Задача</label><input type="text" id="tn" value="'+esc(draft.n)+'" placeholder="Что нужно сделать"></div>'+
+    '<div class="two"><div class="mf"><label>Важность</label><div class="chips" id="imp">'+IMP.map(x=>'<button class="chip'+(draft.imp===x[0]?" on":"")+'" data-v="'+x[0]+'">'+x[1]+"</button>").join("")+'</div></div>'+
+    '<div class="mf"><label>Срочность</label><div class="chips" id="urg">'+URG.map(x=>'<button class="chip'+(draft.urg===x[0]?" on":"")+'" data-v="'+x[0]+'">'+x[1]+"</button>").join("")+'</div></div></div>'+
+    '<div class="mf"><label>Вес</label><div class="range"><input type="range" id="wr" min="1" max="60" value="'+draft.w+'"><div class="val" id="wv">'+draft.w+'%</div></div><div class="hint" id="wh"></div></div>'+
+    '<div class="mf"><label>Плашка</label><div class="chips" id="bd">'+BADGES.map((bx,i)=>'<button class="chip'+(draft.badge&&draft.badge.t===bx.t?" on":"")+'" data-i="'+i+'">'+bx.t+"</button>").join("")+'<button class="chip" data-i="own">+ своя</button><button class="chip'+(draft.badge===null&&!isNew?" on":"")+'" data-i="none">Без плашки</button></div>'+
+    '<input type="text" id="ownb" placeholder="Текст плашки" style="margin-top:8px;display:none" value=""></div>'+
+    '<div class="mf"><label>Подпункты</label><div id="subs"></div><button class="smalladd" id="addsub" style="width:auto;padding:8px 14px">+ шаг</button>'+
+    '<div class="hint">Вес шага — в единичках по времени. 5 шагов по 1 → по 20% каждый внутри задачи. Шаг вдвое сложнее → 2.</div></div>'+
+    (isNew?"":'<div class="mf"><label>Перенести на другой день</label><input type="date" id="mv" value="'+sel+'"></div>')+
+    '<div class="acts">'+(isNew?"":'<button class="del" id="del">Удалить</button>')+'<button data-x>Отмена</button><button class="go" id="tgo">'+(isNew?"Добавить":"Сохранить")+"</button></div>");
   const wr=document.getElementById("wr"),wv=document.getElementById("wv"),wh=document.getElementById("wh");
-  const others=planned(sel)-(isNew?0:t.w);
-  const upd=()=>{const tot=others+draft.w;
-    wh.innerHTML="В этом дне уже "+others+"% в других задачах. С этой задачей выйдет <b>"+tot+"%</b>"+
-      (tot>100?" — это овер-планинг. Ограничения нет: проценты просто покажут, какую долю плана ты закрыла."
-        :", остаётся свободно "+(100-tot)+"%.");
-    wv.textContent=draft.w+"%"};
+  const others=planned(sel)-(isNew?0:+(t&&t.w)||0);
+  const upd=()=>{const tot=others+draft.w;wh.textContent="С другими задачами: "+tot+"% дня"+(tot>100?" (овер-планинг)":".");wv.textContent=draft.w+"%"};
   wr.oninput=()=>{draft.w=+wr.value;touched=true;upd();drawSubs()};upd();
-
-  function pick(id,field){document.querySelectorAll("#"+id+" .chip").forEach(b=>b.onclick=()=>{
-    draft[field]=b.dataset.v;document.querySelectorAll("#"+id+" .chip").forEach(x=>x.classList.remove("on"));b.classList.add("on");
-    if(!touched&&draft.imp&&draft.urg){draft.w=SUGGEST[draft.imp+"-"+draft.urg];wr.value=draft.w;upd();drawSubs()}})}
-  pick("imp","imp");pick("urg","urg");
-
-  document.querySelectorAll("#bd .chip").forEach(b=>b.onclick=()=>{
-    document.querySelectorAll("#bd .chip").forEach(x=>x.classList.remove("on"));
-    const own=document.getElementById("ownb");
-    if(b.dataset.i==="none"){own.style.display="none";draft.badge=null;return}
-    b.classList.add("on");
-    if(b.dataset.i==="own"){own.style.display="block";own.focus();draft.badge={t:own.value||"Своя плашка",c:"b-blue"}}
-    else{own.style.display="none";draft.badge=BADGES[+b.dataset.i]}});
+  function pickRow(id,field){document.querySelectorAll("#"+id+" .chip").forEach(b=>b.onclick=()=>{draft[field]=b.dataset.v;document.querySelectorAll("#"+id+" .chip").forEach(x=>x.classList.remove("on"));b.classList.add("on");if(!touched&&draft.imp&&draft.urg){draft.w=SUGGEST[draft.imp+"-"+draft.urg];wr.value=draft.w;upd();drawSubs()}})}
+  pickRow("imp","imp");pickRow("urg","urg");
+  document.querySelectorAll("#bd .chip").forEach(b=>b.onclick=()=>{document.querySelectorAll("#bd .chip").forEach(x=>x.classList.remove("on"));b.classList.add("on");const own=document.getElementById("ownb");if(b.dataset.i==="none"){own.style.display="none";draft.badge=null}else if(b.dataset.i==="own"){own.style.display="block";own.focus();draft.badge={t:own.value||"Своя плашка",c:"b-blue"}}else{own.style.display="none";draft.badge=BADGES[+b.dataset.i]}});
   document.getElementById("ownb").oninput=e=>{draft.badge={t:e.target.value,c:"b-blue"}};
-
   function drawSubs(){
     const box=document.getElementById("subs");box.innerHTML="";
     const tot=draft.subs.reduce((a,s)=>a+(+s.u||0),0)||1;
     draft.subs.forEach((s,i)=>{
       const r=document.createElement("div");r.className="subrow";
-      r.innerHTML='<input type="text" placeholder="Шаг '+(i+1)+'" value="'+esc(s.n)+'">'+
-        '<input type="number" min="0.5" step="0.5" value="'+s.u+'"><span class="sp">'+fmt(draft.w*s.u/tot)+"%</span><button>×</button>";
-      const[nm,un]=r.querySelectorAll("input");
-      nm.oninput=e=>s.n=e.target.value;
-      un.oninput=e=>{s.u=+e.target.value||1;drawSubs()};
+      r.innerHTML='<input type="text" placeholder="Шаг '+(i+1)+'" value="'+esc(s.n)+'"><input type="number" min="0.5" step="0.5" value="'+s.u+'"><span class="sp">'+fmt(draft.w*s.u/tot)+'%</span><button>×</button>';
+      const[nm,un]=r.querySelectorAll("input");nm.oninput=e=>s.n=e.target.value;un.oninput=e=>{s.u=+e.target.value||1;drawSubs()};
       r.querySelector("button").onclick=()=>{if(draft.subs.length>1){draft.subs.splice(i,1);drawSubs()}};
       box.appendChild(r)});
   }
   drawSubs();
   document.getElementById("addsub").onclick=()=>{draft.subs.push(sub("",1));drawSubs()};
-  if(!isNew)document.getElementById("del").onclick=()=>deleteModal(t);
-  document.getElementById("go").onclick=()=>{
+  if(!isNew)document.getElementById("del").onclick=()=>{closeModal();deleteModal(t)};
+  document.getElementById("tgo").onclick=()=>{
     draft.n=document.getElementById("tn").value.trim()||"Без названия";
-    draft.subs=draft.subs.filter(s=>s.n.trim());
-    if(!draft.subs.length)draft.subs=[sub("Сделать",1)];
+    draft.subs=draft.subs.filter(s=>s.n.trim());if(!draft.subs.length)draft.subs=[sub("Сделать",1)];
     if(isNew){draft.id=uid();d.tasks.push(draft)}
-    else{const mv=document.getElementById("mv").value;Object.assign(t,draft);
-      if(mv&&mv!==sel){day(mv).tasks.push(t);d.tasks=d.tasks.filter(x=>x.id!==t.id);
-        toast("Задача перенесена на "+human(mv).toLowerCase())}}
-    closeModal();save();render()};
+    else{const mv=(document.getElementById("mv")||{}).value;Object.assign(t,draft);
+      if(mv&&mv!==sel){deleteModal(t,true,mv)}}
+    closeModal();scheduleSave();render()};
 }
 document.getElementById("addtask").onclick=()=>taskModal(null);
 
-/* ---------- delete: this day / this and later / everywhere ---------- */
-function matches(x,t){return t.sid?x.sid===t.sid:x.n===t.n}
-function countIn(t,from){
-  let n=0;Object.keys(S.days).forEach(k=>{if(from&&k<from)return;
-    n+=(S.days[k].tasks||[]).filter(x=>matches(x,t)).length});return n}
-function deleteModal(t){
-  const later=countIn(t,sel),all=countIn(t,null);
-  openModal('<h3>Удалить задачу</h3>'+
-    '<p class="lead">«'+esc(t.n)+'» встречается в '+all+" "+(all===1?"дне":all<5?"днях":"днях")+
-    '. Выбери, что удалить.</p>'+
-    '<button class="opt" data-s="one"><b>Только в этом дне</b><span>Останется во всех остальных днях</span></button>'+
-    '<button class="opt" data-s="fwd"><b>В этом и всех следующих</b><span>Затронет '+later+" "+(later===1?"день":later<5?"дня":"дней")+
-      ' · прошлые дни останутся как есть</span></button>'+
-    '<button class="opt" data-s="all"><b>Во всех днях</b><span>Затронет '+all+" "+(all===1?"день":all<5?"дня":"дней")+
-      ' · включая уже прошедшие</span></button>'+
+function deleteModal(t,justMove,moveTo){
+  if(justMove){day(moveTo).tasks.push(t);day(sel).tasks=day(sel).tasks.filter(x=>x.id!==t.id);scheduleSave();render();toast("Перенесено на "+human(moveTo).toLowerCase());return}
+  const matches=x=>t.sid?x.sid===t.sid:x.n===t.n;
+  const fwd=Object.keys(S.days).filter(k=>k>=sel&&(S.days[k].tasks||[]).some(matches)).length;
+  const all=Object.keys(S.days).filter(k=>(S.days[k].tasks||[]).some(matches)).length;
+  openModal('<h3>Удалить задачу</h3><p class="lead">«'+esc(t.n)+'»</p>'+
+    '<button class="opt" data-s="one"><b>Только в этом дне</b><span>Во всех остальных останется</span></button>'+
+    '<button class="opt" data-s="fwd"><b>Этот и все следующие дни</b><span>'+fwd+' дней затронуто</span></button>'+
+    '<button class="opt" data-s="all"><b>Везде, включая прошлые</b><span>'+all+' дней затронуто</span></button>'+
     '<div class="acts"><button data-x>Отмена</button></div>');
   document.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
     const s=b.dataset.s;
+    const arch={id:uid(),n:t.n,deletedOn:todayKey(),deletedFrom:sel,scope:s};
+    S.archive.push(arch);
     if(s==="one")day(sel).tasks=day(sel).tasks.filter(x=>x.id!==t.id);
-    else Object.keys(S.days).forEach(k=>{
-      if(s==="fwd"&&k<sel)return;
-      S.days[k].tasks=(S.days[k].tasks||[]).filter(x=>!matches(x,t))});
-    closeModal();save();render();
-    toast(s==="one"?"Удалено в этом дне.":s==="fwd"?"Удалено в этом и следующих днях.":"Удалено везде.")});
+    else Object.keys(S.days).forEach(k=>{if(s==="fwd"&&k<sel)return;S.days[k].tasks=(S.days[k].tasks||[]).filter(x=>!matches(x))});
+    closeModal();scheduleSave();render();toast(s==="one"?"Удалено только сегодня.":s==="fwd"?"Удалено из этого и следующих дней.":"Удалено везде.")});
+}
+document.getElementById("archivebtn").onclick=()=>{
+  const a=S.archive||[];
+  openModal('<h3>Архив удалённых</h3><p class="lead">Задачи, которые ты удалила. Восстановить нельзя — архив только для истории.</p>'+
+    (a.length?a.slice().reverse().map(x=>'<div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:14px"><b>'+esc(x.n)+'</b><span style="color:var(--mut);font-size:12px;margin-left:10px">удалено '+shortHuman(x.deletedOn)+'</span></div>').join(""):'<p style="color:var(--mut)">Архив пустой.</p>')+
+    '<div class="acts"><button data-x>Закрыть</button><button class="del" id="clarch">Очистить архив</button></div>');
+  document.getElementById("clarch").onclick=()=>{S.archive=[];closeModal();scheduleSave()};
+};
+
+function bonusModal(b){
+  const isNew=!b;const d=b||{id:uid(),n:"",star:false,due:null,doneOn:null};
+  openModal('<h3>'+(isNew?"Необязательная задача":"Изменить")+'</h3>'+
+    '<div class="mf"><label>Что нужно сделать</label><input type="text" id="bn" value="'+esc(d.n)+'"></div>'+
+    '<div class="mf"><label>Дедлайн</label><div class="chips" id="dch"><button class="chip" data-d="7">На этой неделе</button><button class="chip" data-d="14">На следующей</button><button class="chip" data-d="30">В этом месяце</button><button class="chip" data-d="">Без срока</button></div><input type="date" id="bd" style="margin-top:8px" value="'+(d.due||"")+'"></div>'+
+    '<div class="mf"><label>Пометка</label><div class="chips"><button class="chip'+(d.star?" on":"")+'" id="stb">★ Звёздочка</button></div></div>'+
+    '<div class="acts">'+(isNew?"":'<button class="del" id="bdel">Удалить</button>')+'<button data-x>Отмена</button><button class="go" id="bgo">'+(isNew?"Добавить":"Сохранить")+'</button></div>');
+  let star=d.star;document.getElementById("stb").onclick=e=>{star=!star;e.target.classList.toggle("on",star)};
+  document.querySelectorAll("#dch .chip").forEach(c=>c.onclick=()=>{document.getElementById("bd").value=c.dataset.d?shift(todayKey(),+c.dataset.d):""});
+  if(!isNew)document.getElementById("bdel").onclick=()=>{S.bonus=S.bonus.filter(x=>x.id!==b.id);closeModal();scheduleSave();render()};
+  document.getElementById("bgo").onclick=()=>{const n=document.getElementById("bn").value.trim();if(!n)return;d.n=n;d.star=star;d.due=document.getElementById("bd").value||null;if(isNew)S.bonus.push(d);closeModal();scheduleSave();render()};
+}
+document.getElementById("addbonus").onclick=()=>bonusModal(null);
+
+/* ---------- carry ---------- */
+function carryModal(k){
+  const d=day(k),miss=d.quota.filter(q=>quotaVisible(q)&&q.done<need(q));
+  openModal('<h3>Перенести невыполненное</h3><p class="lead">'+miss.map(q=>(need(q)-q.done)+" "+q.n).join(", ")+'. Исходный план дня не изменится — у выбранного дня норма вырастет.</p>'+
+    '<div class="mf"><label>Перенести на</label><input type="date" id="cdate" value="'+shift(k,1)+'"></div>'+
+    '<div class="acts"><button data-x>Отмена</button><button class="go" id="cgo">Перенести</button></div>');
+  document.getElementById("cgo").onclick=()=>{
+    const to=document.getElementById("cdate").value;if(!to||to===k)return;
+    const t=day(to);
+    miss.forEach(q=>{const left=need(q)-q.done;q.moved+=left;let tq=t.quota.find(x=>x.id===q.id);if(tq)tq.extra+=left;else t.quota.push({id:q.id,n:q.n,goal:0,done:0,moved:0,extra:left,skipped:0});S.carries.push({id:uid(),from:k,to:to,qid:q.id,n:q.n,amount:left})});
+    closeModal();scheduleSave();render();toast("Перенесено — у "+SHORT[dateOf(to).getDay()]+" норма выросла.")};
 }
 
-/* ---------- goals & rewards ---------- */
-function goalsModal(first){
-  const p=S.profile;
-  let goals=p.goals.length?JSON.parse(JSON.stringify(p.goals)):[{id:uid(),t:"",dream:true}];
-  openModal('<h3>'+(first?"Давай настроим приложение под тебя":"Цели и награды")+'</h3>'+
-    '<p class="lead">Три коротких блока. Цели нужны, чтобы задачи дня не выглядели случайным списком: когда видишь, ради чего всё это, легче не бросить на середине. Награды — чтобы за сделанное сверх плана что-то доставалось, а не только следующая задача.</p>'+
-    '<div class="f"><label>Чем ты занимаешься</label>'+
-    '<input type="text" id="ab" value="'+esc(p.about||"")+'" placeholder="Например: студентка, снимаю видео и веду таргет">'+
-    '<div class="hint">По этому я подбираю формулировки — совет фотографу и совет студентке звучат по-разному.</div></div>'+
-    '<div class="f"><label>Цели на ближайшее время</label><div id="gl"></div>'+
-    '<button class="smalladd" id="gadd" style="width:auto;padding:9px 16px">+ ещё цель</button>'+
-    '<div class="hint">Отметь флажком главную — ту самую большую мечту. Она будет встречать тебя при входе.</div></div>'+
-    '<div class="f"><label>Чем ты себя радуешь</label>'+
-    '<textarea id="j" rows="3" placeholder="Пиши как привычно: гуляю, пью кофе, читаю, сериал, ванна">'+esc((p.joys||[]).join(", "))+'</textarea>'+
-    '<div class="hint">Можно просто перечислить через запятую — я сама переведу это в нормальное предложение. Раз в неделю спрошу, как ты отдыхала, и дополню список.</div></div>'+
-    '<div class="acts">'+(first?'<button data-x>Потом</button>':'<button data-x>Отмена</button>')+
-    '<button class="go" id="ogo">Сохранить</button></div>');
-  const drawG=()=>{
-    const box=document.getElementById("gl");box.innerHTML="";
-    goals.forEach((g,i)=>{
-      const r=document.createElement("div");r.className="goalrow";
-      r.innerHTML='<input type="text" value="'+esc(g.t)+'" placeholder="Например: переехать и работать в финансах">'+
-        '<button class="dr'+(g.dream?" on":"")+'" title="Главная мечта">✦</button>'+
-        '<button class="dr">×</button>';
-      const[inp]=r.querySelectorAll("input");
-      const[dr,rm]=r.querySelectorAll("button");
-      inp.oninput=e=>g.t=e.target.value;
-      dr.onclick=()=>{goals.forEach(x=>x.dream=false);g.dream=true;drawG()};
-      rm.onclick=()=>{goals.splice(i,1);if(!goals.length)goals.push({id:uid(),t:"",dream:true});drawG()};
-      box.appendChild(r)});
-  };
-  drawG();
-  document.getElementById("gadd").onclick=()=>{goals.push({id:uid(),t:"",dream:false});drawG()};
-  if(first){const skip=document.querySelector(".acts [data-x]");
-    if(skip)skip.onclick=()=>{S.profile.onboarded=true;S.profile.lastAsk=Date.now();closeModal();save()}}
-  document.getElementById("ogo").onclick=()=>{
-    S.profile.about=document.getElementById("ab").value.trim();
-    S.profile.goals=goals.filter(g=>g.t.trim());
-    if(S.profile.goals.length&&!S.profile.goals.some(g=>g.dream))S.profile.goals[0].dream=true;
-    S.profile.joys=document.getElementById("j").value.split(/[,\n;]+/).map(x=>x.trim()).filter(Boolean);
-    S.profile.onboarded=true;if(first)S.profile.lastAsk=Date.now();
-    S.profile.dreamHidden=null;closeModal();save();render()};
-}
-document.getElementById("goalsbtn").onclick=()=>goalsModal(false);
-
-function maybeWeeklyAsk(){
-  if(!S.profile.onboarded)return;
-  if(!S.profile.lastAsk||Date.now()-S.profile.lastAsk<7*864e5)return;
-  openModal('<h3>Как прошла неделя</h3>'+
-    '<p class="lead">Спрашиваю раз в неделю: чем ты себя радовала и как отдыхала. Добавлю в список — так награды не приедаются.</p>'+
-    '<div class="f"><label>Что было приятного</label><textarea id="j" rows="3" placeholder="Через запятую"></textarea></div>'+
-    '<div class="acts"><button data-x>Пропустить</button><button class="go" id="wgo">Сохранить</button></div>');
-  document.getElementById("wgo").onclick=()=>{
-    const add=document.getElementById("j").value.split(/[,\n;]+/).map(x=>x.trim()).filter(Boolean);
-    add.forEach(a=>{if(!S.profile.joys.includes(a))S.profile.joys.push(a)});
-    S.profile.lastAsk=Date.now();closeModal();save()};
-}
-function dreamPing(){
-  const dream=S.profile.goals.find(g=>g.dream);
-  if(!dream||S.profile.dreamShown===todayKey())return;
-  S.profile.dreamShown=todayKey();save();
-  setTimeout(()=>toast("С возвращением. Главное на сегодня ты помнишь: "+dream.t.toLowerCase()+". Всё остальное в списке — просто шаги к этому."),900);
-}
-
-/* ---------- natural Russian for rewards ---------- */
-const JOY_MAP=[
-  [/^(гуля|погуля|прогул)/,"надеть наушники и пройтись любимым маршрутом"],
-  [/коф/,"дойти до кофейни и взять что-нибудь с собой"],
-  [/чай/,"заварить чай и посидеть без телефона"],
-  [/(чита|книг)/,"забраться с книгой куда-нибудь помягче"],
-  [/(сериал|смотрю|фильм|кино)/,"поставить серию и никуда не торопиться"],
-  [/(ванн|душ)/,"устроить долгую ванну"],
-  [/(сплю|сон|поспа|высып)/,"лечь пораньше и выспаться без будильника"],
-  [/(музык|слуша)/,"включить музыку погромче и ничего не делать"],
-  [/(бега|пробеж|спорт|зал|йог|теннис)/,"размяться и выдохнуть"],
-  [/(рису|скетч|творч)/,"порисовать для себя, без цели"],
-  [/(пекарн|десерт|сладк|торт|булоч)/,"дойти до пекарни за чем-нибудь тёплым"],
-  [/(морожен|айскрим)/,"взять мороженое"],
-  [/(готов|ужин|обед|поесть|еда|ем|вкусн)/,"приготовить что-то вкусное себе"],
-  [/(канцеляр|блокнот|ручк|магазин|шопинг|покупа)/,"зайти и купить себе что-нибудь маленькое и приятное"],
-  [/(друз|подруг|созвон|поболта)/,"списаться с кем-то из своих"],
-  [/(игр|поигра)/,"поиграть"],
-  [/(мор|пляж|вода)/,"выбраться поближе к воде"],
-  [/(маникюр|уход|маск|космет)/,"устроить себе уход"],
-  [/(сериал|тикток|листа|полежа|ничего)/,"честно полежать и ничего не делать"]
-];
-function joyPhrase(raw){
-  const s=raw.toLowerCase().trim();
-  for(const[re,out]of JOY_MAP)if(re.test(s))return out;
-  if(/(ю|у)$/.test(s))return "вернуться к тому, что любишь — "+s.replace(/ю$/,"ть").replace(/у$/,"ть");
-  return "устроить себе то, что ты любишь: "+s;
-}
-function partOfDay(){const h=new Date().getHours();
-  return h<11?"morning":h<16?"day":h<21?"evening":"night"}
-function reward(n){
-  const joys=S.profile.joys||[];
-  const j=joys.length?joyPhrase(joys[Math.floor(Math.random()*joys.length)]):null;
-  const pod=partOfDay();
-  const praise=n===1?["Одна необязательная закрыта — та, которую можно было спокойно не трогать сегодня.",
-      "Первая сверх плана. Приятно, когда делаешь не потому, что горит."]:
-    n<4?["Уже "+n+" необязательных за день — это заметно больше, чем требовалось.",
-      n+" сверх плана. День явно вышел не пустой."]:
-    ["Ты закрыла "+n+" необязательных задач. Их вообще-то можно было отложить — а ты не отложила.",
-     n+" сверх плана за один день. Это уже не «между делом»."];
-  const when=pod==="morning"?"Впереди целый день, но пауза уже заслужена: "
-    :pod==="day"?"Середина дня — самое время выдохнуть: "
-    :pod==="evening"?"Вечер, и это можно себе позволить прямо сейчас: "
-    :"Поздно, так что самое время закрыть ноутбук: ";
-  const tail=j?" "+when+j+".":" Расскажи в «целях и наградах», чем ты себя радуешь, — буду подсказывать конкретнее.";
-  toast(praise[Math.floor(Math.random()*praise.length)]+tail);
-}
-let tt;function toast(m){const e=document.getElementById("toast");e.textContent=m;e.classList.add("on");
-  clearTimeout(tt);tt=setTimeout(()=>e.classList.remove("on"),6500)}
-
-/* ---------- repeat editor ---------- */
-const DOW=[[1,"Пн"],[2,"Вт"],[3,"Ср"],[4,"Чт"],[5,"Пт"],[6,"Сб"],[0,"Вс"]];
-function ruleText(r){
-  const a=r.amount+" шт";
-  if(r.mode==="daily")return a+" каждый день";
-  if(r.mode==="weekdays"){const d=DOW.filter(x=>(r.days||[]).includes(x[0])).map(x=>x[1]);
-    return d.length?a+" по "+d.join(", "):a+" — дни не выбраны"}
-  if(r.mode==="cycle")return a+" по графику "+r.on+"/"+r.off+", с "+shortHuman(r.start);
-  return a+" каждые "+r.every+" дн., с "+shortHuman(r.start);
-}
-function rhythmModal(){
-  if(!S.rules)S.rules=defaultRules();
+/* ---------- repeats ---------- */
+function ruleText(r){const a=r.amount+" шт";if(r.mode==="daily")return a+" · каждый день";if(r.mode==="weekdays"){const dn=DOW.filter(x=>(r.days||[]).includes(x[0])).map(x=>x[1]);return a+" · "+dn.join(", ")}if(r.mode==="cycle")return a+" · "+r.on+"/"+r.off+" с "+shortHuman(r.start);return a+" · каждые "+r.every+" дн."}
+function repeatsModal(){
   const draw=()=>{
-    openModal('<h3>Повторяющиеся задачи</h3>'+
-      '<p class="lead">Как в календаре: задача и её повтор. Каждый день, по выбранным дням недели, по графику смен или каждые N дней. В дни, когда задача не повторяется, она просто не показывается.</p>'+
-      '<div id="rl">'+(S.rules.length?S.rules.map(r=>
-        '<button class="opt" data-r="'+r.id+'"><b>'+esc(r.n)+'</b><span>'+ruleText(r)+'</span></button>').join("")
-        :'<p class="hint">Пока ничего не повторяется.</p>')+"</div>"+
+    openModal('<h3>Повторяющиеся задачи</h3><p class="lead">Норма на каждый день — как в Google Calendar. Задача не повторяется в этот день → строка не показывается.</p>'+
+      '<div id="rl">'+(S.rules.length?S.rules.map(r=>'<button class="opt" data-r="'+r.id+'"><b>'+esc(r.n)+'</b><span>'+ruleText(r)+'</span></button>').join(""):'<p style="color:var(--mut)">Ничего нет</p>')+'</div>'+
       '<button class="smalladd" id="radd" style="width:auto;padding:9px 16px">+ повторяющаяся задача</button>'+
       '<div class="acts"><button class="go" data-x>Готово</button></div>');
     document.querySelectorAll("#rl .opt").forEach(b=>b.onclick=()=>ruleModal(S.rules.find(r=>r.id===b.dataset.r),draw));
     document.getElementById("radd").onclick=()=>ruleModal(null,draw);
-  };
-  draw();
+  };draw();
 }
 function ruleModal(r,back){
-  const isNew=!r;
-  const d=r?JSON.parse(JSON.stringify(r)):
-    {id:uid(),qid:uid(),n:"",amount:1,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()};
+  const isNew=!r;const d=r?JSON.parse(JSON.stringify(r)):{id:uid(),qid:uid(),n:"",amount:1,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()};
   const draw=()=>{
-    openModal('<h3>'+(isNew?"Новая повторяющаяся задача":"Повтор")+'</h3>'+
-      '<div class="two"><div class="f"><label>Название</label>'+
-      '<input type="text" id="rn" value="'+esc(d.n)+'" placeholder="Например: разговорные"></div>'+
-      '<div class="f"><label>Сколько за день</label><input type="number" id="ra" min="1" value="'+d.amount+'"></div></div>'+
-      '<div class="f"><label>Повторять</label><div class="chips" id="rm">'+
-        [["daily","Каждый день"],["weekdays","По дням недели"],["cycle","График смен"],["everyN","Каждые N дней"]]
-          .map(x=>'<button class="chip'+(d.mode===x[0]?" on":"")+'" data-m="'+x[0]+'">'+x[1]+"</button>").join("")+
-        '</div><div id="rbody" style="margin-top:14px"></div></div>'+
+    openModal('<h3>'+(isNew?"Новый повтор":"Изменить повтор")+'</h3>'+
+      '<div class="two"><div class="mf"><label>Название</label><input type="text" id="rn" value="'+esc(d.n)+'" placeholder="Например: обычные ролики"></div>'+
+      '<div class="mf"><label>Количество в день</label><input type="number" id="ra" min="1" value="'+d.amount+'"></div></div>'+
+      '<div class="mf"><label>Повторять</label><div class="chips" id="rm">'+
+        [["daily","Каждый день"],["weekdays","По дням недели"],["cycle","График смен"],["everyN","Каждые N дней"]].map(x=>'<button class="chip'+(d.mode===x[0]?" on":"")+'" data-m="'+x[0]+'">'+x[1]+"</button>").join("")+
+      '</div><div id="rbody" style="margin-top:12px"></div></div>'+
       '<div class="hint" id="rprev"></div>'+
-      '<div class="acts">'+(isNew?"":'<button class="del" id="rdel">Удалить</button>')+
-      '<button data-x id="rback">Назад</button><button class="go" id="rgo">'+(isNew?"Добавить":"Сохранить")+"</button></div>");
-
+      '<div class="acts">'+(isNew?"":'<button class="del" id="rdel">Удалить</button>')+'<button id="rback">Назад</button><button class="go" id="rgo">'+(isNew?"Добавить":"Сохранить")+"</button></div>");
     document.getElementById("rn").oninput=e=>{d.n=e.target.value;prev()};
     document.getElementById("ra").oninput=e=>{d.amount=Math.max(1,+e.target.value||1);prev()};
-    document.querySelectorAll("#rm .chip").forEach(b=>b.onclick=()=>{
-      d.mode=b.dataset.m;document.querySelectorAll("#rm .chip").forEach(x=>x.classList.remove("on"));
-      b.classList.add("on");body()});
-
+    document.querySelectorAll("#rm .chip").forEach(b=>b.onclick=()=>{d.mode=b.dataset.m;document.querySelectorAll("#rm .chip").forEach(x=>x.classList.remove("on"));b.classList.add("on");body()});
     function body(){
       const box=document.getElementById("rbody");
       if(d.mode==="weekdays"){
-        box.innerHTML='<div class="chips">'+DOW.map(x=>'<button class="chip'+
-          ((d.days||[]).includes(x[0])?" on":"")+'" data-d="'+x[0]+'">'+x[1]+"</button>").join("")+"</div>";
-        box.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{
-          const v=+b.dataset.d;d.days=(d.days||[]).includes(v)?d.days.filter(x=>x!==v):d.days.concat(v);
-          b.classList.toggle("on");prev()});
+        box.innerHTML='<div class="chips">'+DOW.map(x=>'<button class="chip'+((d.days||[]).includes(x[0])?" on":"")+'" data-d="'+x[0]+'">'+x[1]+"</button>").join("")+"</div>";
+        box.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{const v=+b.dataset.d;d.days=(d.days||[]).includes(v)?d.days.filter(x=>x!==v):[...(d.days||[]),v];b.classList.toggle("on");prev()});
       }else if(d.mode==="cycle"){
-        box.innerHTML='<div class="subrow"><span style="flex:1;font-size:15px">Работаю дней</span>'+
-          '<input type="number" id="ron" min="1" value="'+d.on+'" style="width:80px"></div>'+
-          '<div class="subrow"><span style="flex:1;font-size:15px">Потом выходных</span>'+
-          '<input type="number" id="roff" min="0" value="'+d.off+'" style="width:80px"></div>'+
-          '<div class="subrow"><span style="flex:1;font-size:15px">Первый рабочий день</span>'+
-          '<input type="date" id="rst" value="'+d.start+'" style="width:auto"></div>'+
-          '<div class="hint">Для графика 2/2 поставь 2 и 2, для 3/1 — 3 и 1.</div>';
+        box.innerHTML='<div class="subrow"><span style="flex:1">Работаю дней</span><input type="number" id="ron" min="1" value="'+d.on+'" style="width:75px"></div>'+
+          '<div class="subrow"><span style="flex:1">Выходных</span><input type="number" id="roff" min="0" value="'+d.off+'" style="width:75px"></div>'+
+          '<div class="subrow"><span style="flex:1">Первый рабочий день</span><input type="date" id="rst" value="'+d.start+'" style="width:auto"></div>';
         box.querySelector("#ron").oninput=e=>{d.on=Math.max(1,+e.target.value||1);prev()};
         box.querySelector("#roff").oninput=e=>{d.off=Math.max(0,+e.target.value||0);prev()};
         box.querySelector("#rst").onchange=e=>{d.start=e.target.value;prev()};
       }else if(d.mode==="everyN"){
-        box.innerHTML='<div class="subrow"><span style="flex:1;font-size:15px">Каждые</span>'+
-          '<input type="number" id="rev" min="1" value="'+d.every+'" style="width:80px"><span style="font-size:15px">дн.</span></div>'+
-          '<div class="subrow"><span style="flex:1;font-size:15px">Начиная с</span>'+
-          '<input type="date" id="rst" value="'+d.start+'" style="width:auto"></div>';
+        box.innerHTML='<div class="subrow"><span style="flex:1">Каждые</span><input type="number" id="rev" min="1" value="'+d.every+'" style="width:75px"><span>дн.</span></div>'+
+          '<div class="subrow"><span style="flex:1">Начиная с</span><input type="date" id="rst" value="'+d.start+'" style="width:auto"></div>';
         box.querySelector("#rev").oninput=e=>{d.every=Math.max(1,+e.target.value||1);prev()};
         box.querySelector("#rst").onchange=e=>{d.start=e.target.value;prev()};
-      }else box.innerHTML='<div class="hint">Задача будет появляться каждый день.</div>';
+      }else box.innerHTML='<div class="hint">Задача будет каждый день.</div>';
       prev();
     }
-    function prev(){
-      let out=[];for(let i=0;i<14;i++){const k=shift(todayKey(),i);
-        if(ruleHits(d,k))out.push(SHORT[dateOf(k).getDay()]+" "+dateOf(k).getDate())}
-      document.getElementById("rprev").innerHTML="Ближайшие две недели: "+
-        (out.length?out.join(" · "):"ни одного дня — проверь настройки");
-    }
+    function prev(){let out=[];for(let i=0;i<14;i++){const k=shift(todayKey(),i);if(ruleHits(d,k))out.push(SHORT[dateOf(k).getDay()]+" "+dateOf(k).getDate())}document.getElementById("rprev").innerHTML="Ближайшие 2 недели: "+(out.length?out.join(" · "):"ни одного дня")}
     body();
     document.getElementById("rback").onclick=()=>{closeModal();back()};
-    if(!isNew)document.getElementById("rdel").onclick=()=>{
-      S.rules=S.rules.filter(x=>x.id!==d.id);
-      if(!S.rules.some(x=>x.qid===d.qid))
-        Object.keys(S.days).forEach(k=>{S.days[k].quota=(S.days[k].quota||[]).filter(q=>q.id!==d.qid)});
-      closeModal();save();render();back()};
+    if(!isNew)document.getElementById("rdel").onclick=()=>{S.rules=S.rules.filter(x=>x.id!==d.id);closeModal();scheduleSave();render();back()};
     document.getElementById("rgo").onclick=()=>{
       d.n=d.n.trim()||"Без названия";
-      const twin=S.rules.find(x=>x.id!==d.id&&x.n.toLowerCase()===d.n.toLowerCase());
-      if(twin)d.qid=twin.qid;
+      const twin=S.rules.find(x=>x.id!==d.id&&x.n.toLowerCase()===d.n.toLowerCase());if(twin)d.qid=twin.qid;
       if(isNew)S.rules.push(d);else Object.assign(r,d);
       S.rules.filter(x=>x.qid===d.qid).forEach(x=>x.n=d.n);
-      closeModal();save();render();back()};
-  };
-  draw();
+      closeModal();scheduleSave();render();back()};
+  };draw();
 }
-document.getElementById("rhythmbtn").onclick=rhythmModal;
+document.getElementById("repeatsbtn").onclick=repeatsModal;
+
+/* ---------- goals ---------- */
+function goalsModal(first){
+  const p=S.profile;let goals=p.goals.length?JSON.parse(JSON.stringify(p.goals)):[{id:uid(),t:"",dream:true}];
+  openModal('<h3>Цели и награды</h3><p class="lead">Главная цель будет напоминать о себе при каждом заходе. Список радостей — для подсказок, когда закроешь что-то необязательное.</p>'+
+    '<div class="mf"><label>Кем ты занимаешься</label><input type="text" id="ab" value="'+esc(p.about||"")+'" placeholder="Например: студентка, снимаю видео, веду таргет"></div>'+
+    '<div class="mf"><label>Цели</label><div id="gl"></div><button class="smalladd" id="gadd" style="width:auto;padding:8px 14px">+ цель</button><div class="hint">✦ — главная мечта, она встречает тебя при входе</div></div>'+
+    '<div class="mf"><label>Чем себя радуешь</label><textarea id="j" rows="3" placeholder="Через запятую: гуляю, пью кофе, сериал">'+esc((p.joys||[]).join(", "))+'</textarea></div>'+
+    '<div class="acts">'+(first?'<button data-x>Потом</button>':'<button data-x>Отмена</button>')+'<button class="go" id="ogo">Сохранить</button></div>');
+  const drawG=()=>{const box=document.getElementById("gl");box.innerHTML="";goals.forEach((g,i)=>{const r=document.createElement("div");r.className="goalrow";r.innerHTML='<input type="text" value="'+esc(g.t)+'" placeholder="Например: работать в финансах за рубежом"><button class="dr'+(g.dream?" on":"")+'" title="Главная мечта">✦</button><button>×</button>';const[inp]=r.querySelectorAll("input");const[dr,rm]=r.querySelectorAll("button");inp.oninput=e=>g.t=e.target.value;dr.onclick=()=>{goals.forEach(x=>x.dream=false);g.dream=true;drawG()};rm.onclick=()=>{goals.splice(i,1);if(!goals.length)goals.push({id:uid(),t:"",dream:true});drawG()};box.appendChild(r)})};
+  drawG();
+  document.getElementById("gadd").onclick=()=>{goals.push({id:uid(),t:"",dream:false});drawG()};
+  document.getElementById("ogo").onclick=()=>{S.profile.about=document.getElementById("ab").value.trim();S.profile.goals=goals.filter(g=>g.t.trim());if(S.profile.goals.length&&!S.profile.goals.some(g=>g.dream))S.profile.goals[0].dream=true;S.profile.joys=document.getElementById("j").value.split(/[,\n;]+/).map(x=>x.trim()).filter(Boolean);S.profile.onboarded=true;if(first)S.profile.lastAsk=Date.now();S.profile.dreamHidden=null;closeModal();scheduleSave();render()};
+  if(first){const skip=document.querySelector(".acts [data-x]");if(skip)skip.onclick=()=>{S.profile.onboarded=true;S.profile.lastAsk=Date.now();closeModal();scheduleSave()}}
+}
+document.getElementById("goalsbtn").onclick=()=>goalsModal(false);
+
+function maybeWeeklyAsk(){
+  if(!S.profile.onboarded||!S.profile.lastAsk||Date.now()-S.profile.lastAsk<7*864e5)return;
+  openModal('<h3>Как прошла неделя</h3><p class="lead">Чем отдыхала? Добавлю в список наград.</p>'+
+    '<div class="mf"><label>Что было приятного</label><textarea id="j" rows="3" placeholder="Через запятую"></textarea></div>'+
+    '<div class="acts"><button data-x>Пропустить</button><button class="go" id="wgo">Сохранить</button></div>');
+  document.getElementById("wgo").onclick=()=>{const add=document.getElementById("j").value.split(/[,\n;]+/).map(x=>x.trim()).filter(Boolean);add.forEach(a=>{if(!S.profile.joys.includes(a))S.profile.joys.push(a)});S.profile.lastAsk=Date.now();closeModal();scheduleSave()};
+}
+
+/* ---------- rewards ---------- */
+const JOY_MAP=[[/^(гуля|погуля|прогул)/,"надеть наушники и пройтись любимым маршрутом"],[/коф/,"дойти до кофейни и взять что-нибудь с собой"],[/чай/,"заварить чай и посидеть без телефона"],[[/(чита|книг)/,"забраться с книгой куда-нибудь помягче"]],[/(сериал|фильм|кино)/,"поставить серию и никуда не торопиться"],[/(ванн|душ)/,"устроить долгую ванну"],[/(сплю|сон|поспа)/,"лечь пораньше и выспаться без будильника"],[/(бега|пробеж|теннис|спорт)/,"размяться и выдохнуть"],[/(пекарн|десерт|сладк|мороже)/,"дойти до пекарни за чем-нибудь тёплым"],[/(канцеляр|блокнот|шопинг)/,"зайти и купить себе что-нибудь маленькое"]];
+function joyPhrase(raw){const s=(raw||"").toLowerCase().trim();for(const[re,out]of JOY_MAP)if(re.test&&re.test(s))return out;return"порадовать себя: "+s}
+function reward(n){const j=S.profile.joys||[];const pick=j.length?joyPhrase(j[Math.floor(Math.random()*j.length)]):null;const h=new Date().getHours();const when=h<12?"Утро":h<17?"День":h<21?"Вечер":"Ночь";const praise=n===1?"Первая необязательная — та, что можно было не трогать.":n<4?"Уже "+n+" сверх плана — это заметно.":"Ты закрыла "+n+" необязательных. Их вообще не нужно было делать сегодня.";toast(praise+(pick?" "+when+" — самое время "+pick+".":""))}
 
 /* ---------- data transfer ---------- */
-const SNIPPET="prompt('Скопируй это (Cmd+C):', JSON.stringify(S))";
-function dataModal(){
-  openModal('<h3>Перенос данных</h3>'+
-    '<p class="lead">Если старый планер остался в другом файле, данные можно забрать оттуда и вставить сюда. Ничего не потеряется: импорт можно отменить, пока ты не нажала «Заменить».</p>'+
-    '<div class="f"><label>Шаг 1 · забрать из старого файла</label>'+
-    '<div class="hint" style="margin:0 0 8px">Открой вкладку со старым планером — <b>не перезагружая её</b> — и нажми Cmd+Option+C. В Safari консоль сначала включается в Настройках → Дополнения → «Показывать функции для веб-разработчиков». Вставь строку ниже, нажми Enter и скопируй содержимое окошка.</div>'+
-    '<textarea id="snip" rows="4" readonly style="font-family:var(--mono);font-size:12px">'+esc(SNIPPET)+'</textarea>'+
-    '<button class="smalladd" id="csnip" style="width:auto;padding:9px 16px">Скопировать строку</button></div>'+
-    '<div class="f"><label>Шаг 2 · вставить сюда</label>'+
-    '<textarea id="imp" rows="4" placeholder="Вставь скопированное сюда"></textarea>'+
-    '<div class="acts" style="margin-top:12px"><button class="go" id="impgo">Заменить данные</button></div></div>'+
-    '<div class="f"><label>Резервная копия этого планера</label>'+
-    '<textarea id="exp" rows="3" readonly>'+esc(JSON.stringify(S))+'</textarea>'+
-    '<div class="hint">Сохрани в заметки — это вся твоя история одной строкой.</div>'+
-    '<button class="smalladd" id="cexp" style="width:auto;padding:9px 16px">Скопировать копию</button></div>'+
+document.getElementById("databtn").onclick=()=>{
+  openModal('<h3>Данные</h3>'+
+    '<div class="mf"><label>Резервная копия</label><textarea id="exp" rows="4" readonly style="font-family:var(--mono);font-size:12px">'+esc(JSON.stringify(S))+'</textarea><button class="smalladd" id="cexp" style="width:auto;padding:8px 14px">Скопировать</button></div>'+
+    '<div class="mf"><label>Восстановить из копии</label><textarea id="imp" rows="4" placeholder="Вставь строку из резервной копии"></textarea><button class="smalladd" id="impgo" style="width:auto;padding:8px 14px">Заменить данные</button></div>'+
     '<div class="acts"><button data-x>Закрыть</button></div>');
-  const copyFrom=id=>{const t=document.getElementById(id);t.select();
-    try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand("copy")}
-    toast("Скопировано.")};
-  document.getElementById("csnip").onclick=()=>copyFrom("snip");
-  document.getElementById("cexp").onclick=()=>copyFrom("exp");
-  document.getElementById("impgo").onclick=()=>{
-    const v=document.getElementById("imp").value.trim();
-    if(!v){toast("Поле пустое — вставь скопированную строку.");return}
-    let parsed;try{parsed=JSON.parse(v)}catch(e){toast("Не похоже на данные планера. Скопируй строку целиком, от { до }.");return}
-    if(!parsed||!parsed.days){toast("В этой строке нет дней планера.");return}
-    S=migrate(parsed);sel=todayKey();closeModal();save();render();
-    toast("Данные перенесены: "+Object.keys(S.days).length+" дней, "+S.bonus.length+" необязательных задач.")};
-}
-document.getElementById("databtn").onclick=dataModal;
+  document.getElementById("cexp").onclick=()=>{const t=document.getElementById("exp");t.select();try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand("copy")}toast("Скопировано")};
+  document.getElementById("impgo").onclick=()=>{try{const v=JSON.parse(document.getElementById("imp").value.trim());if(!v.days)throw 0;S=migrate(v);sel=todayKey();closeModal();scheduleSave();render();toast("Данные восстановлены")}catch(e){toast("Не похоже на данные планера")}};
+};
 
 /* ---------- nav ---------- */
 document.getElementById("prev").onclick=()=>{sel=shift(sel,-1);render()};
 document.getElementById("next").onclick=()=>{sel=shift(sel,1);render()};
 document.getElementById("tobtn").onclick=()=>{sel=todayKey();render()};
-document.addEventListener("keydown",e=>{
-  if(document.getElementById("mask").classList.contains("on")){if(e.key==="Escape")closeModal();return}
-  if(e.key==="ArrowLeft"){sel=shift(sel,-1);render()}
-  if(e.key==="ArrowRight"){sel=shift(sel,1);render()}});
+document.addEventListener("keydown",e=>{if(document.getElementById("mask").classList.contains("on")){if(e.key==="Escape")closeModal();return}if(e.key==="ArrowLeft"){sel=shift(sel,-1);render()}if(e.key==="ArrowRight"){sel=shift(sel,1);render()}});
 
-load();
+/* ---------- toast ---------- */
+let tt;function toast(m){const e=document.getElementById("toast");e.textContent=m;e.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>e.classList.remove("on"),6000)}
+
+initAuth();
 </script>
