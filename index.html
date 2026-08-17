@@ -221,7 +221,10 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
         <div class="f"><label>Фамилия</label><input type="text" id="fSurname" placeholder="Фамилия"></div>
       </div>
       <div class="f"><label>Телефон</label><input type="tel" id="fPhone" placeholder="+7 999 000 00 00"></div>
-      <div class="f"><label>Дата рождения</label><input type="date" id="fBday"></div>
+      <div class="f"><label>Дата рождения</label>
+        <input type="date" id="fBday" max="2008-12-31" min="1920-01-01"
+          style="padding:12px 14px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe;width:100%;-webkit-appearance:none;appearance:none">
+      </div>
     </div>
     <div class="f"><label>Email</label><input type="email" id="aEmail" placeholder="your@email.com"></div>
     <div class="f"><label>Пароль</label>
