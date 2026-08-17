@@ -2,7 +2,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Планер</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase/2.39.3/umd/supabase.min.js"></script>
 <style>
 :root{
   --ink:#0f1424;--ink2:#4a566e;--mut:#8a94a8;
@@ -18,21 +17,38 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* AUTH */
 .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .auth-box{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:36px;
-  width:min(420px,100%)}
+  width:min(440px,100%)}
 .auth-box h1{margin:0 0 6px;font-size:26px}
 .auth-box .sub{color:var(--ink2);font-size:15px;margin:0 0 28px}
 .auth-tabs{display:flex;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:24px}
-.auth-tabs button{flex:1;padding:10px;border:none;background:#f5f7fb;font-weight:600;font-size:15px}
+.auth-tabs button{flex:1;padding:10px;border:none;background:#f5f7fb;font-weight:600;font-size:15px;cursor:pointer}
 .auth-tabs button.on{background:var(--ink);color:#fff}
 .f{margin-bottom:16px}
 .f label{display:block;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin-bottom:7px}
-.f input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe}
+.f input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe;-webkit-appearance:none}
 .f input:focus{outline:2px solid var(--blue);border-color:transparent}
+.pass-row{position:relative}
+.pass-row input{padding-right:110px}
+.pass-gen{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  border:1px solid var(--line);background:#f4f6fa;border-radius:7px;padding:5px 10px;
+  font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.pass-gen:hover{background:#e8eaf2}
+.strength{margin-top:8px;display:none}
+.strength.on{display:block}
+.strength-bar{height:5px;border-radius:3px;background:#e3e7ef;overflow:hidden;margin-bottom:6px}
+.strength-bar i{display:block;height:100%;border-radius:3px;transition:width .3s,background .3s}
+.strength-rules{display:flex;flex-direction:column;gap:3px}
+.rule{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.rule.ok{color:var(--green)}
+.rule::before{content:"○";font-size:10px}
+.rule.ok::before{content:"●";color:var(--green)}
 .btn-full{width:100%;padding:14px;border-radius:12px;border:none;background:var(--ink);color:#fff;
-  font-size:16px;font-weight:700;margin-top:8px}
+  font-size:16px;font-weight:700;margin-top:8px;cursor:pointer;-webkit-appearance:none}
 .btn-full:disabled{opacity:.5;cursor:not-allowed}
-.auth-err{color:var(--red);font-size:14px;margin-top:10px;display:none}
+.auth-err{font-size:14px;margin-top:10px;padding:10px 14px;border-radius:8px;display:none}
 .auth-err.on{display:block}
+.auth-err.err{background:#fef4f2;color:var(--red);border:1px solid #fca5a5}
+.auth-err.ok{background:#f2fbf7;color:var(--green);border:1px solid #86efac}
 
 /* APP */
 .app{display:none;padding:18px 40px 80px}
@@ -194,14 +210,39 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
 <div class="auth-wrap" id="authWrap">
   <div class="auth-box">
     <h1>Планер</h1>
-    <p class="sub">Войди, чтобы твои задачи были только твоими</p>
+    <p class="sub">Войди или создай аккаунт</p>
     <div class="auth-tabs">
       <button class="on" id="tabLogin">Войти</button>
       <button id="tabReg">Регистрация</button>
     </div>
-    <div class="mf"><label>Email</label><input type="email" id="aEmail" placeholder="почта@example.com" autocomplete="email"></div>
-    <div class="mf"><label>Пароль</label><input type="password" id="aPass" placeholder="••••••••" autocomplete="current-password"></div>
-    <div class="mf" id="aPass2wrap" style="display:none"><label>Пароль ещё раз</label><input type="password" id="aPass2" placeholder="••••••••"></div>
+    <div id="regFields" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="f"><label>Имя</label><input type="text" id="fName" placeholder="Имя"></div>
+        <div class="f"><label>Фамилия</label><input type="text" id="fSurname" placeholder="Фамилия"></div>
+      </div>
+      <div class="f"><label>Телефон</label><input type="tel" id="fPhone" placeholder="+7 999 000 00 00"></div>
+      <div class="f"><label>Дата рождения</label><input type="date" id="fBday"></div>
+    </div>
+    <div class="f"><label>Email</label><input type="email" id="aEmail" placeholder="your@email.com"></div>
+    <div class="f"><label>Пароль</label>
+      <div class="pass-row">
+        <input type="password" id="aPass" placeholder="минимум 8 символов">
+        <button class="pass-gen" id="genBtn" type="button">Сгенерировать</button>
+      </div>
+      <div class="strength" id="strength">
+        <div class="strength-bar"><i id="strengthBar"></i></div>
+        <div class="strength-rules">
+          <div class="rule" id="r-len">Минимум 8 символов</div>
+          <div class="rule" id="r-upper">Заглавная буква (A–Z)</div>
+          <div class="rule" id="r-num">Цифра (0–9)</div>
+          <div class="rule" id="r-sym">Символ (!@#$%^&*)</div>
+        </div>
+      </div>
+    </div>
+    <div class="f" id="aPass2wrap" style="display:none">
+      <label>Пароль ещё раз</label>
+      <input type="password" id="aPass2" placeholder="повтори пароль">
+    </div>
     <button class="btn-full" id="aBtn">Войти</button>
     <div class="auth-err" id="aErr"></div>
   </div>
@@ -258,10 +299,8 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPA_URL="https://dtiwlacligiqyjeeajqo.supabase.co";
-const SUPA_KEY="sb_publishable_WG2evSttf8_OnhtgKdb1PA_X7SApdzn";
-const {createClient}=supabase;
-const sb=createClient(SUPA_URL,SUPA_KEY);
+var SB_URL='https://dtiwlacligiqyjeeajqo.supabase.co';
+var SB_KEY='sb_publishable_WG2evSttf8_OnhtgKdb1PA_X7SApdzn';
 
 const KEY="planner_v3";
 const DAYNAMES=["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"];
@@ -288,16 +327,28 @@ const daysBetween=(a,b)=>Math.round((dateOf(b)-dateOf(a))/864e5);
 const sub=(n,u)=>({id:uid(),n:n||"",u:+u||1,done:false});
 const task=(n,w,imp,urg,badge,subs,grid,sid)=>({id:uid(),sid:sid||null,n,w:+w||10,imp,urg,badge,subs,grid:!!grid});
 
-/* ---------- Supabase sync ---------- */
+/* ---------- Supabase DB via fetch ---------- */
+function sbHeader(){
+  var tok=localStorage.getItem('sb_token')||SB_KEY;
+  return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+tok,'Prefer':'return=minimal'};
+}
 async function loadFromDB(){
   if(!user)return null;
-  const{data,error}=await sb.from("planner_data").select("data").eq("user_id",user.id).maybeSingle();
-  if(error||!data)return null;
-  return data.data;
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/planner_data?select=data&user_id=eq.'+user.id+'&limit=1',
+      {headers:Object.assign({},sbHeader(),{'Prefer':'return=representation'})});
+    var rows=await r.json();
+    if(Array.isArray(rows)&&rows.length)return rows[0].data;
+  }catch(e){}
+  return null;
 }
 async function saveToDB(){
   if(!user||!S)return;
-  await sb.from("planner_data").upsert({user_id:user.id,data:S},{onConflict:"user_id"});
+  try{
+    await fetch(SB_URL+'/rest/v1/planner_data',{method:'POST',
+      headers:Object.assign({},sbHeader(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
+      body:JSON.stringify({user_id:user.id,data:S})});
+  }catch(e){}
 }
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveToDB,600)}
 
@@ -412,12 +463,15 @@ function maybeWeeklyReset(){
 
 /* ---------- AUTH ---------- */
 async function initAuth(){
-  const{data:{session}}=await sb.auth.getSession();
-  if(session){await startApp(session.user);return}
-  sb.auth.onAuthStateChange(async(_ev,sess)=>{
-    if(sess)await startApp(sess.user);
-    else showAuth();
-  });
+  var token=localStorage.getItem('sb_token');
+  if(token){
+    try{
+      var r=await fetch(SB_URL+'/auth/v1/user',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+token}});
+      var u=await r.json();
+      if(u&&u.id){await startApp(u);return}
+    }catch(e){}
+    localStorage.removeItem('sb_token');localStorage.removeItem('sb_refresh');
+  }
   showAuth();
 }
 function showAuth(){document.getElementById("authWrap").style.display="flex";document.getElementById("appWrap").classList.remove("on")}
@@ -425,9 +479,9 @@ async function startApp(u){
   user=u;
   document.getElementById("authWrap").style.display="none";
   document.getElementById("appWrap").classList.add("on");
-  document.getElementById("userbtn").textContent=u.email.split("@")[0]+" →";
-  let raw=await loadFromDB();
-  if(!raw){try{const v=localStorage.getItem(KEY);if(v)raw=JSON.parse(v)}catch(e){}}
+  document.getElementById("userbtn").textContent=(u.email||'').split("@")[0]+" →";
+  var raw=await loadFromDB();
+  if(!raw){try{var v=localStorage.getItem(KEY);if(v)raw=JSON.parse(v)}catch(e){}}
   S=raw?migrate(raw):seed();
   sel=todayKey();
   maybeWeeklyReset();
@@ -435,34 +489,95 @@ async function startApp(u){
   if(!S.profile.onboarded)goalsModal(true);
   else maybeWeeklyAsk();
 }
-let authMode="login";
-document.getElementById("tabLogin").onclick=()=>{authMode="login";document.getElementById("tabLogin").classList.add("on");document.getElementById("tabReg").classList.remove("on");document.getElementById("aPass2wrap").style.display="none";document.getElementById("aBtn").textContent="Войти";document.getElementById("aErr").classList.remove("on")};
-document.getElementById("tabReg").onclick=()=>{authMode="reg";document.getElementById("tabReg").classList.add("on");document.getElementById("tabLogin").classList.remove("on");document.getElementById("aPass2wrap").style.display="block";document.getElementById("aBtn").textContent="Создать аккаунт";document.getElementById("aErr").classList.remove("on")};
-document.getElementById("aBtn").onclick=async()=>{
-  const email=document.getElementById("aEmail").value.trim();
-  const pass=document.getElementById("aPass").value;
-  const errEl=document.getElementById("aErr");
-  errEl.classList.remove("on");
-  if(!email||!pass){errEl.textContent="Заполни почту и пароль";errEl.classList.add("on");return}
-  document.getElementById("aBtn").disabled=true;
-  if(authMode==="reg"){
-    const pass2=document.getElementById("aPass2").value;
-    if(pass!==pass2){errEl.textContent="Пароли не совпадают";errEl.classList.add("on");document.getElementById("aBtn").disabled=false;return}
-    const{error}=await sb.auth.signUp({email,password:pass});
-    if(error){errEl.textContent=error.message;errEl.classList.add("on");document.getElementById("aBtn").disabled=false;return}
-    errEl.style.color="var(--green)";errEl.textContent="Проверь почту — мы отправили подтверждение";errEl.classList.add("on");
-  }else{
-    const{error}=await sb.auth.signInWithPassword({email,password:pass});
-    if(error){errEl.textContent="Неверная почта или пароль";errEl.classList.add("on");document.getElementById("aBtn").disabled=false;return}
+/* ---------- AUTH UI ---------- */
+var authMode='login';
+function g(id){return document.getElementById(id)}
+
+function showAuthMsg(text,type){
+  var el=g('aErr');el.textContent=text;
+  el.className='auth-err'+(text?' on '+(type||'err'):'');
+}
+function setAuthMode(m){
+  authMode=m;var isReg=m==='reg';
+  g('tabLogin').classList.toggle('on',!isReg);
+  g('tabReg').classList.toggle('on',isReg);
+  g('regFields').style.display=isReg?'block':'none';
+  g('aPass2wrap').style.display=isReg?'block':'none';
+  g('aBtn').textContent=isReg?'Создать аккаунт':'Войти';
+  g('strength').classList.toggle('on',isReg);
+  showAuthMsg('','');
+}
+g('tabLogin').addEventListener('click',function(){setAuthMode('login')});
+g('tabReg').addEventListener('click',function(){setAuthMode('reg')});
+
+function checkPass(p){
+  return{len:p.length>=8,upper:/[A-Z]/.test(p),num:/[0-9]/.test(p),sym:/[!@#$%^&*()\-_+=\[\]{};':"\\|,.<>/?]/.test(p)};
+}
+function updateStrength(p){
+  var c=checkPass(p),score=[c.len,c.upper,c.num,c.sym].filter(Boolean).length;
+  var cols=['#9f1239','#ef4444','#f59e0b','#22c55e','#159A66'];
+  var bar=g('strengthBar');bar.style.width=(score*25)+'%';bar.style.background=cols[score];
+  ['len','upper','num','sym'].forEach(function(k){g('r-'+k).classList.toggle('ok',c[k])});
+}
+g('aPass').addEventListener('input',function(){if(authMode==='reg')updateStrength(this.value)});
+
+function genPassword(){
+  var U='ABCDEFGHJKLMNPQRSTUVWXYZ',L='abcdefghjkmnpqrstuvwxyz',N='23456789',S='!@#$%^&*';
+  var all=U+L+N+S,pwd=[U[Math.random()*U.length|0],L[Math.random()*L.length|0],N[Math.random()*N.length|0],S[Math.random()*S.length|0]];
+  for(var i=0;i<8;i++)pwd.push(all[Math.random()*all.length|0]);
+  pwd.sort(function(){return Math.random()-.5});
+  var result=pwd.join('');
+  g('aPass').value=result;g('aPass').type='text';
+  if(g('aPass2'))g('aPass2').value=result;
+  updateStrength(result);
+  setTimeout(function(){g('aPass').type='password'},2000);
+  try{navigator.clipboard.writeText(result);showAuthMsg('Пароль сгенерирован и скопирован','ok')}catch(e){}
+}
+g('genBtn').addEventListener('click',genPassword);
+
+async function sbPost(path,body){
+  var r=await fetch(SB_URL+path,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},body:JSON.stringify(body)});
+  return r.json();
+}
+
+async function doAuth(){
+  var email=g('aEmail').value.trim(),pass=g('aPass').value;
+  showAuthMsg('','');
+  if(!email||!pass){showAuthMsg('Заполни почту и пароль','err');return}
+  if(authMode==='reg'){
+    var c=checkPass(pass);
+    if(!c.len||!c.upper||!c.num||!c.sym){showAuthMsg('Пароль не соответствует требованиям','err');return}
+    var pass2=g('aPass2')&&g('aPass2').value;
+    if(pass!==pass2){showAuthMsg('Пароли не совпадают','err');return}
   }
-  document.getElementById("aBtn").disabled=false;
-};
-document.getElementById("aEmail").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("aPass").focus()});
-document.getElementById("aPass").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("aBtn").click()});
-document.getElementById("userbtn").onclick=()=>{
-  openModal('<h3>Аккаунт</h3><p class="lead">'+esc(user.email)+'</p>'+
-    '<div class="acts"><button data-x>Закрыть</button><button class="del" id="signout">Выйти из аккаунта</button></div>');
-  document.getElementById("signout").onclick=async()=>{await sb.auth.signOut();closeModal();showAuth()};
+  var btn=g('aBtn');btn.disabled=true;btn.textContent='Подождите...';
+  try{
+    if(authMode==='reg'){
+      var d=await sbPost('/auth/v1/signup',{email:email,password:pass,data:{
+        name:(g('fName')||{value:''}).value,surname:(g('fSurname')||{value:''}).value,
+        phone:(g('fPhone')||{value:''}).value,bday:(g('fBday')||{value:''}).value}});
+      if(d.error||d.msg){showAuthMsg(d.error||d.msg||'Ошибка','err');btn.disabled=false;btn.textContent='Создать аккаунт';return}
+      showAuthMsg('Письмо отправлено на '+email+'. Подтверди почту, потом войди.','ok');
+      btn.disabled=false;btn.textContent='Создать аккаунт';
+    }else{
+      var d=await sbPost('/auth/v1/token?grant_type=password',{email:email,password:pass});
+      if(d.error||d.error_description){showAuthMsg('Неверная почта или пароль','err');btn.disabled=false;btn.textContent='Войти';return}
+      if(d.access_token){
+        localStorage.setItem('sb_token',d.access_token);
+        localStorage.setItem('sb_refresh',d.refresh_token||'');
+        user=d.user;showAuthMsg('Вхожу...','ok');
+        setTimeout(function(){startApp(d.user)},500);
+      }
+    }
+  }catch(e){showAuthMsg('Ошибка сети — попробуй ещё раз','err');btn.disabled=false;btn.textContent=authMode==='reg'?'Создать аккаунт':'Войти'}
+}
+g('aBtn').addEventListener('click',doAuth);
+g('aPass').addEventListener('keydown',function(e){if(e.key==='Enter')doAuth()});
+g('aPass2')&&g('aPass2').addEventListener('keydown',function(e){if(e.key==='Enter')doAuth()});
+g('userbtn').onclick=function(){
+  openModal('<h3>Аккаунт</h3><p class="lead">'+esc(user&&user.email||'')+'</p>'+
+    '<div class="acts"><button data-x>Закрыть</button><button class="del" id="signout">Выйти</button></div>');
+  g('signout').onclick=function(){localStorage.removeItem('sb_token');localStorage.removeItem('sb_refresh');closeModal();document.getElementById('authWrap').style.display='flex';document.getElementById('appWrap').classList.remove('on');user=null};
 };
 
 /* ---------- render ---------- */
