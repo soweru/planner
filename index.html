@@ -222,8 +222,21 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
       </div>
       <div class="f"><label>Телефон</label><input type="tel" id="fPhone" placeholder="+7 999 000 00 00"></div>
       <div class="f"><label>Дата рождения</label>
-        <input type="date" id="fBday" max="2008-12-31" min="1920-01-01"
-          style="padding:12px 14px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe;width:100%;-webkit-appearance:none;appearance:none">
+        <div style="display:grid;grid-template-columns:72px 1fr 90px;gap:8px">
+          <input type="tel" id="fBday" placeholder="ДД" maxlength="2" inputmode="numeric"
+            style="padding:12px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe;text-align:center">
+          <select id="fBmon" style="padding:12px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe">
+            <option value="">Месяц</option>
+            <option value="01">Январь</option><option value="02">Февраль</option>
+            <option value="03">Март</option><option value="04">Апрель</option>
+            <option value="05">Май</option><option value="06">Июнь</option>
+            <option value="07">Июль</option><option value="08">Август</option>
+            <option value="09">Сентябрь</option><option value="10">Октябрь</option>
+            <option value="11">Ноябрь</option><option value="12">Декабрь</option>
+          </select>
+          <input type="tel" id="fByear" placeholder="ГГГГ" maxlength="4" inputmode="numeric"
+            style="padding:12px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fbfcfe;text-align:center">
+        </div>
       </div>
     </div>
     <div class="f"><label>Email</label><input type="email" id="aEmail" placeholder="your@email.com"></div>
@@ -538,6 +551,15 @@ function genPassword(){
 }
 g('genBtn').addEventListener('click',genPassword);
 
+/* auto-advance between date fields */
+g('fBday').addEventListener('input',function(){
+  var v=this.value.replace(/\D/g,'');this.value=v;
+  if(v.length===2)g('fBmon').focus();
+});
+g('fBmon').addEventListener('change',function(){
+  if(this.value)g('fByear').focus();
+});
+
 async function sbPost(path,body){
   var r=await fetch(SB_URL+path,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},body:JSON.stringify(body)});
   return r.json();
@@ -558,7 +580,11 @@ async function doAuth(){
     if(authMode==='reg'){
       var d=await sbPost('/auth/v1/signup',{email:email,password:pass,data:{
         name:(g('fName')||{value:''}).value,surname:(g('fSurname')||{value:''}).value,
-        phone:(g('fPhone')||{value:''}).value,bday:(g('fBday')||{value:''}).value}});
+        phone:(g('fPhone')||{value:''}).value,
+        bday:(function(){
+          var d=g('fBday').value.padStart(2,'0'),m=g('fBmon').value,y=g('fByear').value;
+          return(d&&m&&y)?y+'-'+m+'-'+d:'';
+        })()}});
       if(d.error||d.msg){showAuthMsg(d.error||d.msg||'Ошибка','err');btn.disabled=false;btn.textContent='Создать аккаунт';return}
       showAuthMsg('Письмо отправлено на '+email+'. Подтверди почту, потом войди.','ok');
       btn.disabled=false;btn.textContent='Создать аккаунт';
