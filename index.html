@@ -351,7 +351,7 @@ function sbHeader(){
 async function loadFromDB(){
   if(!user)return null;
   try{
-    var r=await fetch(SB_URL+'/rest/v1/planner_data?select=data&user_id=eq.'+encodeURIComponent(user.id)+'&limit=1',
+    var r=await fetch(SB_URL+'/rest/v1/planner_data?select=data&user_id=eq.'+encodeURIComponent(user.id)+'&order=updated_at.desc&limit=1',
       {headers:Object.assign({},sbHeader(),{'Prefer':'return=representation'})});
     if(!r.ok){console.warn('loadFromDB status',r.status);return null;}
     var rows=await r.json();
@@ -363,23 +363,31 @@ async function saveToDB(){
   if(!user||!S)return;
   var body=JSON.stringify({user_id:user.id,data:S});
   try{
-    var r=await fetch(SB_URL+'/rest/v1/planner_data',{
-      method:'POST',
-      headers:Object.assign({},sbHeader(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
+    // First try update existing row
+    var ru=await fetch(SB_URL+'/rest/v1/planner_data?user_id=eq.'+encodeURIComponent(user.id),{
+      method:'PATCH',
+      headers:Object.assign({},sbHeader(),{'Prefer':'return=minimal'}),
       body:body
     });
-    if(!r.ok){
-      var t=await r.text();
-      console.error('saveToDB failed',r.status,t);
-      toast('⚠️ Не удалось сохранить данные в облако. Сделай резервную копию через «данные».');
+    if(ru.ok){
+      // If no rows updated, insert new one
+      var affected=ru.headers.get('content-range');
+      if(affected==='*/*'||!affected){
+        await fetch(SB_URL+'/rest/v1/planner_data',{
+          method:'POST',
+          headers:Object.assign({},sbHeader(),{'Prefer':'return=minimal'}),
+          body:body
+        });
+      }
+      try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e){}
       return;
     }
-    // also backup locally
-    try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e){}
+    console.error('saveToDB patch failed',ru.status);
+    toast('⚠️ Не удалось сохранить. Сделай резервную копию через «данные».');
   }catch(e){
     console.error('saveToDB network',e);
     try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e2){}
-    toast('⚠️ Нет сети — данные сохранены локально. Подключись к интернету, чтобы синхронизировать.');
+    toast('⚠️ Нет сети — данные сохранены локально.');
   }
 }
 var saveTimer=null;
