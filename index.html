@@ -328,7 +328,7 @@ const BADGES=[{t:"Обязательно сейчас",c:"b-red"},{t:"До ве�
 const SUGGEST={"hi-hi":22,"hi-mid":16,"hi-low":12,"mid-hi":14,"mid-mid":10,"mid-low":7,"low-hi":8,"low-mid":5,"low-low":3};
 const DOW=[[1,"Пн"],[2,"Вт"],[3,"Ср"],[4,"Чт"],[5,"Пт"],[6,"Сб"],[0,"Вс"]];
 
-let S=null,sel=null,user=null,dragId=null,saveTimer=null;
+let S=null,sel=null,user=null,dragId=null;
 
 const uid=()=>Math.random().toString(36).slice(2,9);
 const esc=s=>String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -346,30 +346,48 @@ const task=(n,w,imp,urg,badge,subs,grid,sid)=>({id:uid(),sid:sid||null,n,w:+w||1
 /* ---------- Supabase DB via fetch ---------- */
 function sbHeader(){
   var tok=localStorage.getItem('sb_token')||SB_KEY;
-  return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+tok,'Prefer':'return=minimal'};
+  return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+tok};
 }
 async function loadFromDB(){
   if(!user)return null;
   try{
-    var r=await fetch(SB_URL+'/rest/v1/planner_data?select=data&user_id=eq.'+user.id+'&limit=1',
+    var r=await fetch(SB_URL+'/rest/v1/planner_data?select=data&user_id=eq.'+encodeURIComponent(user.id)+'&limit=1',
       {headers:Object.assign({},sbHeader(),{'Prefer':'return=representation'})});
+    if(!r.ok){console.warn('loadFromDB status',r.status);return null;}
     var rows=await r.json();
-    if(Array.isArray(rows)&&rows.length)return rows[0].data;
-  }catch(e){}
+    if(Array.isArray(rows)&&rows.length&&rows[0].data)return rows[0].data;
+  }catch(e){console.error('loadFromDB',e)}
   return null;
 }
 async function saveToDB(){
   if(!user||!S)return;
+  var body=JSON.stringify({user_id:user.id,data:S});
   try{
-    await fetch(SB_URL+'/rest/v1/planner_data',{method:'POST',
+    var r=await fetch(SB_URL+'/rest/v1/planner_data',{
+      method:'POST',
       headers:Object.assign({},sbHeader(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
-      body:JSON.stringify({user_id:user.id,data:S})});
-    localStorage.setItem(KEY+'_'+user.id,JSON.stringify(S));
+      body:body
+    });
+    if(!r.ok){
+      var t=await r.text();
+      console.error('saveToDB failed',r.status,t);
+      toast('⚠️ Не удалось сохранить данные в облако. Сделай резервную копию через «данные».');
+      return;
+    }
+    // also backup locally
+    try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e){}
   }catch(e){
-    try{localStorage.setItem(KEY+'_'+user.id,JSON.stringify(S))}catch(e2){}
+    console.error('saveToDB network',e);
+    try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e2){}
+    toast('⚠️ Нет сети — данные сохранены локально. Подключись к интернету, чтобы синхронизировать.');
   }
 }
-function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveToDB,600)}
+var saveTimer=null;
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  // save fast — 300ms, not 600
+  saveTimer=setTimeout(saveToDB,300);
+}
 
 /* ---------- state ---------- */
 const defaultRules=()=>[
@@ -500,11 +518,26 @@ async function startApp(u){
   document.getElementById("appWrap").classList.add("on");
   document.getElementById("userbtn").textContent=(u.email||'').split("@")[0]+" →";
   var raw=await loadFromDB();
-  if(!raw){try{var v=localStorage.getItem(KEY+'_'+u.id);if(!v)v=localStorage.getItem(KEY);if(v)raw=JSON.parse(v)}catch(e){}}
+  if(!raw){
+    // fallback: try user-specific local backup
+    try{
+      var v=localStorage.getItem(KEY+'_'+u.id);
+      if(v)raw=JSON.parse(v);
+    }catch(e){}
+  }
+  if(!raw){
+    // last resort: anonymous local data (old version before auth)
+    try{
+      var v=localStorage.getItem(KEY);
+      if(v)raw=JSON.parse(v);
+    }catch(e){}
+  }
   S=raw?migrate(raw):seed();
   sel=todayKey();
   maybeWeeklyReset();
   render();
+  // save to DB immediately so data is there on next login
+  await saveToDB();
   if(!S.profile.onboarded)goalsModal(true);
   else maybeWeeklyAsk();
 }
