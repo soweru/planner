@@ -273,7 +273,6 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
       <div class="dt" id="dt"></div>
       <button class="nav" id="next">›</button>
       <button class="tb" id="tobtn">сегодня</button>
-      <button class="tb" id="repeatsbtn">повторы</button>
       <button class="tb" id="goalsbtn">цели</button>
       <button class="tb" id="databtn">данные</button>
       <button class="tb user" id="userbtn"></button>
@@ -344,57 +343,42 @@ const sub=(n,u)=>({id:uid(),n:n||"",u:+u||1,done:false});
 const task=(n,w,imp,urg,badge,subs,grid,sid)=>({id:uid(),sid:sid||null,n,w:+w||10,imp,urg,badge,subs,grid:!!grid});
 
 /* ---------- Supabase DB via fetch ---------- */
-function sbHeader(){
+function sbHeaders(extra){
   var tok=localStorage.getItem('sb_token')||SB_KEY;
-  return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+tok};
+  return Object.assign({'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+tok},extra||{});
 }
 async function loadFromDB(){
   if(!user)return null;
   try{
-    var r=await fetch(SB_URL+'/rest/v1/planner_data?select=data&user_id=eq.'+encodeURIComponent(user.id)+'&order=updated_at.desc&limit=1',
-      {headers:Object.assign({},sbHeader(),{'Prefer':'return=representation'})});
-    if(!r.ok){console.warn('loadFromDB status',r.status);return null;}
+    var r=await fetch(SB_URL+'/rest/v1/planner_data?select=data&user_id=eq.'+user.id+'&order=updated_at.desc&limit=1',
+      {headers:sbHeaders({'Accept':'application/json'})});
+    if(!r.ok)return null;
     var rows=await r.json();
-    if(Array.isArray(rows)&&rows.length&&rows[0].data)return rows[0].data;
-  }catch(e){console.error('loadFromDB',e)}
-  return null;
+    return(Array.isArray(rows)&&rows[0]&&rows[0].data)?rows[0].data:null;
+  }catch(e){return null}
 }
 async function saveToDB(){
   if(!user||!S)return;
-  var body=JSON.stringify({user_id:user.id,data:S});
+  var payload={user_id:user.id,data:S};
+  var body=JSON.stringify(payload);
+  // always backup locally first
+  try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e){}
   try{
-    // First try update existing row
-    var ru=await fetch(SB_URL+'/rest/v1/planner_data?user_id=eq.'+encodeURIComponent(user.id),{
-      method:'PATCH',
-      headers:Object.assign({},sbHeader(),{'Prefer':'return=minimal'}),
-      body:body
-    });
-    if(ru.ok){
-      // If no rows updated, insert new one
-      var affected=ru.headers.get('content-range');
-      if(affected==='*/*'||!affected){
-        await fetch(SB_URL+'/rest/v1/planner_data',{
-          method:'POST',
-          headers:Object.assign({},sbHeader(),{'Prefer':'return=minimal'}),
-          body:body
-        });
-      }
-      try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e){}
-      return;
+    // DELETE old rows then INSERT fresh — avoids upsert conflicts entirely
+    await fetch(SB_URL+'/rest/v1/planner_data?user_id=eq.'+user.id,
+      {method:'DELETE',headers:sbHeaders()});
+    var ri=await fetch(SB_URL+'/rest/v1/planner_data',
+      {method:'POST',headers:sbHeaders({'Prefer':'return=minimal'}),body:body});
+    if(!ri.ok){
+      var t=await ri.text();
+      console.error('saveToDB insert failed',ri.status,t);
     }
-    console.error('saveToDB patch failed',ru.status);
-    toast('⚠️ Не удалось сохранить. Сделай резервную копию через «данные».');
-  }catch(e){
-    console.error('saveToDB network',e);
-    try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e2){}
-    toast('⚠️ Нет сети — данные сохранены локально.');
-  }
+  }catch(e){console.error('saveToDB',e)}
 }
 var saveTimer=null;
 function scheduleSave(){
   clearTimeout(saveTimer);
-  // save fast — 300ms, not 600
-  saveTimer=setTimeout(saveToDB,300);
+  saveTimer=setTimeout(saveToDB,800);
 }
 
 /* ---------- state ---------- */
@@ -547,7 +531,7 @@ async function startApp(u){
   // save to DB immediately so data is there on next login
   await saveToDB();
   if(!S.profile.onboarded)goalsModal(true);
-  else maybeWeeklyAsk();
+  else{maybeWeeklyAsk();weeklyMotivation();}
 }
 /* ---------- AUTH UI ---------- */
 var authMode='login';
@@ -699,8 +683,15 @@ function renderWeek(){
     if(vis.some(q=>q.done<need(q))){
       const c=document.createElement("button");c.className="carry";c.textContent="Перенести";
       c.onclick=ev=>{ev.stopPropagation();carryModal(k)};el.appendChild(c);
-      const pen=document.createElement("button");pen.className="skip";pen.textContent="✎ Изменить план";
-      pen.onclick=ev=>{ev.stopPropagation();quotaModal(k)};el.appendChild(pen);
+    }
+    // always show edit plan
+    const pen=document.createElement("button");pen.className="skip";pen.textContent="✎ план";
+    pen.onclick=ev=>{ev.stopPropagation();quotaModal(k)};el.appendChild(pen);
+    // undo carry if any carries involve this day
+    const hasCarry=(S.carries||[]).some(c=>c.from===k||c.to===k);
+    if(hasCarry){
+      const u=document.createElement("button");u.className="skip";u.textContent="↩ отменить перенос";
+      u.onclick=ev=>{ev.stopPropagation();undoCarryModal(k)};el.appendChild(u);
     }
     el.onclick=()=>{sel=k;render()};
     box.appendChild(el);
@@ -764,37 +755,51 @@ function renderWeekStats(){
 function renderTasks(){
   const box=document.getElementById("tasks");box.innerHTML="";
   const d=day(sel);
-  d.tasks.forEach((t,idx)=>{
-    const p=prog(t),tot=t.subs.reduce((a,s)=>a+(+s.u||0),0)||1;
-    const allDone=p>=100;
+  // auto-sort: "Обязательно сейчас" to top, done to bottom
+  const sorted=[...d.tasks].sort((a,b)=>{
+    const aUrgent=a.badge&&a.badge.c==='b-red',bUrgent=b.badge&&b.badge.c==='b-red';
+    const aDone=prog(a)>=100,bDone=prog(b)>=100;
+    if(aDone!==bDone)return aDone?1:-1;
+    if(aUrgent!==bUrgent)return aUrgent?-1:1;
+    return 0;
+  });
+  sorted.forEach((t,idx)=>{
+    const p=prog(t),allDone=p>=100;
+    const hasRealSubs=t.subs.filter(s=>s.n.trim()).length>0&&!(t.subs.length===1&&t.subs[0].n==='Сделать');
     const el=document.createElement("div");el.className="task"+(allDone?" done":"");el.draggable=true;
     const impL=(IMP.find(x=>x[0]===t.imp)||["",""])[1];
     const urgL=(URG.find(x=>x[0]===t.urg)||["",""])[1];
-    el.innerHTML='<div class="thead"><span class="grip">⠿</span><div class="w">'+t.w+'%</div>'+
+    el.innerHTML='<div class="thead"><span class="grip">⠿</span>'+
+      '<div class="w">'+t.w+'%</div>'+
+      '<input type="checkbox" class="tall-cb" title="Выполнить всё"'+(allDone?" checked":"")+'>'+
       '<div class="tname">'+esc(t.n)+'</div>'+
       (t.badge?'<span class="badge '+t.badge.c+'">'+esc(t.badge.t)+'</span>':'')+
-      '<input type="checkbox" class="tall-cb" title="Выполнить всё"'+(allDone?" checked":"")+'>'+ 
       '<div class="tools"><button data-e="ed" title="Редактировать">✎</button><button data-e="del" title="Удалить">🗑</button></div></div>'+
-      '<div class="meta">'+(impL?"<span>"+impL+"</span>":"")+(urgL?"<span>"+urgL+"</span>":"")+
-      '<span>'+Math.round(p)+'% выполнено</span></div>'+
+      '<div class="meta">'+(impL?'<span>'+impL+'</span>':'')+(urgL?'<span>'+urgL+'</span>':'')+
+      '<span>'+Math.round(p)+'%</span></div>'+
       '<div class="subs'+(t.grid?" grid":"")+'"></div>';
-    const sc=el.querySelector(".subs");
-    t.subs.forEach(s=>{
-      const l=document.createElement("label");l.className="sub"+(s.done?" on":"");
-      l.innerHTML='<input type="checkbox"'+(s.done?" checked":"")+'><span class="txt">'+esc(s.n)+'</span><span class="pct">'+fmt(t.w*s.u/tot)+'%</span>';
-      l.querySelector("input").onchange=e=>{s.done=e.target.checked;scheduleSave();render()};
-      sc.appendChild(l);
-    });
     // master checkbox
     el.querySelector(".tall-cb").onchange=e=>{t.subs.forEach(s=>s.done=e.target.checked);scheduleSave();render()};
+    // subtasks — only show if meaningful
+    if(hasRealSubs){
+      const tot=t.subs.reduce((a,s)=>a+(+s.u||0),0)||1;
+      const sc=el.querySelector(".subs");
+      t.subs.forEach(s=>{
+        const l=document.createElement("label");l.className="sub"+(s.done?" on":"");
+        l.innerHTML='<input type="checkbox"'+(s.done?" checked":"")+'><span class="txt">'+esc(s.n)+'</span><span class="pct">'+fmt(t.w*s.u/tot)+'%</span>';
+        l.querySelector("input").onchange=e=>{s.done=e.target.checked;scheduleSave();render()};
+        sc.appendChild(l);
+      });
+    }
     el.querySelector('[data-e="ed"]').onclick=()=>taskModal(t);
     el.querySelector('[data-e="del"]').onclick=()=>deleteModal(t);
-    // drag
     el.ondragstart=()=>{dragId=t.id;el.style.opacity=".4"};
     el.ondragend=()=>{el.style.opacity="";document.querySelectorAll(".task").forEach(x=>x.classList.remove("drag-over"))};
     el.ondragover=e=>{e.preventDefault();el.classList.add("drag-over")};
     el.ondragleave=()=>el.classList.remove("drag-over");
-    el.ondrop=e=>{e.preventDefault();const from=d.tasks.findIndex(x=>x.id===dragId),to=d.tasks.findIndex(x=>x.id===t.id);if(from>-1&&to>-1&&from!==to){d.tasks.splice(to,0,d.tasks.splice(from,1)[0]);scheduleSave();render()}};
+    el.ondrop=e=>{e.preventDefault();
+      const from=d.tasks.findIndex(x=>x.id===dragId),to=d.tasks.findIndex(x=>x.id===t.id);
+      if(from>-1&&to>-1&&from!==to){d.tasks.splice(to,0,d.tasks.splice(from,1)[0]);scheduleSave();render()}};
     box.appendChild(el);
   });
 }
@@ -825,22 +830,66 @@ function renderBonus(){
 
 function renderSocials(){
   const box=document.getElementById("socials");box.innerHTML="";
+  const period=S.socialPeriod||30;
+  // period tabs
+  const tabs=document.createElement("div");
+  tabs.style.cssText="grid-column:1/-1;display:flex;gap:6px;margin-bottom:4px";
+  [7,30,90,365].forEach(p=>{
+    const b=document.createElement("button");
+    b.textContent=p===7?"7 дн":p===30?"30 дн":p===90?"3 мес":"год";
+    b.style.cssText="padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:"+(p===period?"var(--ink)":"#f5f7fb")+";color:"+(p===period?"#fff":"var(--ink2)")+";font-size:13px;cursor:pointer";
+    b.onclick=()=>{S.socialPeriod=p;scheduleSave();renderSocials()};
+    tabs.appendChild(b);
+  });
+  box.appendChild(tabs);
+
   (S.socials||[]).forEach(soc=>{
     const entries=soc.entries||[];
+    const cutoff=shift(todayKey(),-period);
+    const recent=entries.filter(e=>e.d>=cutoff);
     const last=entries[entries.length-1];
-    const prev=entries[entries.length-2];
+    const first=recent[0];
     const val=last?last.v:null;
-    const delta=last&&prev?last.v-prev.v:null;
+    const delta=last&&first&&first!==last?last.v-first.v:null;
+
     const el=document.createElement("div");el.className="soc";
-    el.innerHTML='<div class="sname">'+esc(soc.name)+'</div>'+
-      '<div class="sval">'+(val!=null?val.toLocaleString("ru"):"—")+'</div>'+
-      '<div class="sdelta '+(delta==null?"same":delta>0?"up":"dn")+'">'+(delta==null?"обновлений нет":delta>0?"+"+delta.toLocaleString("ru"):delta.toLocaleString("ru"))+'</div>'+
-      '<input class="sedit" type="number" placeholder="Новое число" min="0">';
+    el.style.cursor="pointer";
+
+    // sparkline SVG
+    let sparkHtml="";
+    if(recent.length>=2){
+      const W=130,H=40,vals=recent.map(e=>e.v);
+      const mn=Math.min(...vals),mx=Math.max(...vals),range=mx-mn||1;
+      const pts=recent.map((e,i)=>{
+        const x=Math.round(i/(recent.length-1)*(W-4)+2);
+        const y=Math.round(H-2-(e.v-mn)/range*(H-4));
+        return x+","+y;
+      });
+      const col=soc.color||"#2B44E0";
+      sparkHtml='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="display:block;margin-top:6px">'+
+        '<polyline points="'+pts.join(" ")+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'+
+        '</svg>';
+    }else if(recent.length===1){
+      sparkHtml='<div style="font-size:11px;color:var(--mut);margin-top:6px">Нужно ещё одно обновление для графика</div>';
+    }else{
+      sparkHtml='<div style="font-size:11px;color:var(--mut);margin-top:6px">Пока нет данных за этот период</div>';
+    }
+
+    el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+      '<div class="sname">'+esc(soc.name)+'</div>'+
+      '<button class="ed" style="border:none;background:none;color:var(--mut);font-size:12px;cursor:pointer">✎</button></div>'+
+      '<div class="sval" style="color:'+(soc.color||"var(--blue)")+'">'+(val!=null?val.toLocaleString("ru"):"—")+'</div>'+
+      '<div class="sdelta '+(delta==null?"same":delta>0?"up":"dn")+'" style="font-size:12px">'+
+        (delta==null?"нет данных":delta===0?"без изменений":((delta>0?"+":"")+delta.toLocaleString("ru")+" за период"))+'</div>'+
+      sparkHtml+
+      '<input class="sedit" type="number" placeholder="Обновить число" min="0" style="margin-top:8px">';
+    el.querySelector(".ed").onclick=e=>{e.stopPropagation();socialModal(soc)};
     el.querySelector(".sedit").onchange=e=>{
       const v=+e.target.value;if(isNaN(v)||v<0)return;
-      soc.entries=soc.entries||[];soc.entries.push({d:todayKey(),v});
-      if(soc.entries.length>90)soc.entries=soc.entries.slice(-90);
-      e.target.value="";scheduleSave();render();toast(soc.name+" обновлён: "+v.toLocaleString("ru"))};
+      soc.entries=soc.entries||[];
+      soc.entries.push({d:todayKey(),v});
+      if(soc.entries.length>365)soc.entries=soc.entries.slice(-365);
+      e.target.value="";scheduleSave();render();toast(soc.name+": "+v.toLocaleString("ru"))};
     box.appendChild(el);
   });
   const add=document.createElement("button");add.className="soc-add";add.textContent="+ Добавить соцсеть";
@@ -907,9 +956,37 @@ function taskModal(t){
   document.getElementById("tgo").onclick=()=>{
     draft.n=document.getElementById("tn").value.trim()||"Без названия";
     draft.subs=draft.subs.filter(s=>s.n.trim());if(!draft.subs.length)draft.subs=[sub("Сделать",1)];
-    if(isNew){draft.id=uid();d.tasks.push(draft)}
-    else{const mv=(document.getElementById("mv")||{}).value;Object.assign(t,draft);
-      if(mv&&mv!==sel){deleteModal(t,true,mv)}}
+    const isDaily=draft.badge&&draft.badge.t==="Каждый день";
+    if(isNew){
+      draft.id=uid();d.tasks.push(draft);
+      // if "каждый день" — add to all future days too
+      if(isDaily){
+        for(let i=1;i<=30;i++){
+          const fk=shift(sel,i),fd=day(fk);
+          if(!fd.tasks.some(x=>x.n===draft.n)){
+            fd.tasks.push(Object.assign({},JSON.parse(JSON.stringify(draft)),{id:uid(),subs:draft.subs.map(s=>Object.assign({},s,{id:uid(),done:false}))}));
+          }
+        }
+      }
+    }else{
+      const mv=(document.getElementById("mv")||{}).value;
+      // if "каждый день" — propagate name/subs/weight changes to all days
+      if(isDaily){
+        Object.keys(S.days).forEach(k=>{
+          (S.days[k].tasks||[]).forEach(x=>{
+            if(x.n===t.n||x.id===t.id){
+              x.n=draft.n;x.w=draft.w;x.badge=draft.badge;x.imp=draft.imp;x.urg=draft.urg;
+              // update subs structure but keep done state
+              x.subs=draft.subs.map((ds,si)=>{
+                const existing=x.subs[si];
+                return{id:(existing&&existing.id)||uid(),n:ds.n,u:ds.u,done:k===sel?ds.done:(existing?existing.done:false)};
+              });
+            }
+          });
+        });
+      }else Object.assign(t,draft);
+      if(mv&&mv!==sel){deleteModal(t,true,mv)}
+    }
     closeModal();scheduleSave();render()};
 }
 document.getElementById("addtask").onclick=()=>taskModal(null);
@@ -967,7 +1044,24 @@ function carryModal(k){
     closeModal();scheduleSave();render();toast("Перенесено — у "+SHORT[dateOf(to).getDay()]+" норма выросла.")};
 }
 
-/* ---------- repeats ---------- */
+function undoCarryModal(k){
+  const list=(S.carries||[]).filter(c=>c.from===k||c.to===k);
+  openModal('<h3>Отменить перенос</h3><p class="lead">Выбери что вернуть назад.</p>'+
+    '<div id="clist">'+list.map(c=>'<div class="subrow"><span style="flex:1">'+c.amount+' '+esc(c.n)+' · '+SHORT[dateOf(c.from).getDay()]+'→'+SHORT[dateOf(c.to).getDay()]+'</span>'+
+      '<button class="smalladd" data-c="'+c.id+'" style="width:auto;padding:6px 12px;margin:0">вернуть</button></div>').join("")+'</div>'+
+    '<div class="acts"><button data-x>Закрыть</button></div>');
+  document.querySelectorAll("#clist [data-c]").forEach(b=>b.onclick=()=>{
+    const c=(S.carries||[]).find(x=>x.id===b.dataset.c);if(!c)return;
+    const f=day(c.from).quota.find(q=>q.id===c.qid);
+    const t=day(c.to).quota.find(q=>q.id===c.qid);
+    if(f)f.moved=Math.max(0,(f.moved||0)-c.amount);
+    if(t)t.extra=Math.max(0,(t.extra||0)-c.amount);
+    S.carries=S.carries.filter(x=>x.id!==c.id);
+    closeModal();scheduleSave();render();toast("Перенос отменён.");
+  });
+}
+
+
 function ruleText(r){const a=r.amount+" шт";if(r.mode==="daily")return a+" · каждый день";if(r.mode==="weekdays"){const dn=DOW.filter(x=>(r.days||[]).includes(x[0])).map(x=>x[1]);return a+" · "+dn.join(", ")}if(r.mode==="cycle")return a+" · "+r.on+"/"+r.off+" с "+shortHuman(r.start);return a+" · каждые "+r.every+" дн."}
 function repeatsModal(){
   const draw=()=>{
@@ -1025,7 +1119,7 @@ function ruleModal(r,back){
       closeModal();scheduleSave();render();back()};
   };draw();
 }
-document.getElementById("repeatsbtn").onclick=repeatsModal;
+document.getElementById("repeatsbtn")&&(document.getElementById("repeatsbtn").onclick=repeatsModal);
 
 /* ---------- goals ---------- */
 function goalsModal(first){
@@ -1049,6 +1143,33 @@ function maybeWeeklyAsk(){
     '<div class="mf"><label>Что было приятного</label><textarea id="j" rows="3" placeholder="Через запятую"></textarea></div>'+
     '<div class="acts"><button data-x>Пропустить</button><button class="go" id="wgo">Сохранить</button></div>');
   document.getElementById("wgo").onclick=()=>{const add=document.getElementById("j").value.split(/[,\n;]+/).map(x=>x.trim()).filter(Boolean);add.forEach(a=>{if(!S.profile.joys.includes(a))S.profile.joys.push(a)});S.profile.lastAsk=Date.now();closeModal();scheduleSave()};
+}
+
+function weeklyMotivation(){
+  const dow=dateOf(todayKey()).getDay();
+  // show on Wednesday (3) and Sunday (0)
+  if(dow!==3&&dow!==0)return;
+  const lastShown=S.profile.motivShown;
+  const weekKey=shift(todayKey(),-((dow+6)%7));
+  if(lastShown===weekKey)return;
+  S.profile.motivShown=weekKey;
+  // calc week completion
+  const start=weekKey;
+  let done=0,total=0;
+  for(let i=0;i<7;i++){
+    const k=shift(start,i),d=S.days[k];
+    if(!d)continue;
+    (d.tasks||[]).forEach(t=>{done+=prog(t)/100*t.w;total+=t.w});
+  }
+  if(!total)return;
+  const pct=Math.round(done/total*100);
+  const msg=pct>=80?'Ты справляешься с '+pct+'% задач этой недели — это очень хороший результат. Продолжай в том же духе!'
+    :pct>=50?'На этой неделе выполнено '+pct+'% задач. Середина — хорошее время чтобы поднажать.'
+    :'Пока '+pct+'% задач за неделю. Ничего страшного — ещё есть время исправить.';
+  setTimeout(()=>toast(msg),1200);
+  // bonus nudge
+  const pending=S.bonus.filter(b=>!b.doneOn&&b.due&&daysBetween(todayKey(),b.due)<=3);
+  if(pending.length)setTimeout(()=>toast('Кстати, справа есть '+(pending.length===1?'одна необязательная задача со сроком':'несколько необязательных задач со сроком')+' до конца недели — загляни.'),5000);
 }
 
 /* ---------- rewards ---------- */
