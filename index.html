@@ -466,8 +466,24 @@ function daily(){
   ];
 }
 const newQuota=()=>[];
+function getDailyTasks(){
+  // find most recent day that has tasks with "Каждый день" badge
+  const keys=Object.keys(S.days).sort().reverse();
+  for(const k of keys){
+    const tasks=(S.days[k]&&S.days[k].tasks)||[];
+    const dailyOnes=tasks.filter(t=>t.badge&&t.badge.t==="Каждый день");
+    if(dailyOnes.length>0){
+      // return all tasks from that day, but reset done state
+      return tasks.map(t=>Object.assign({},JSON.parse(JSON.stringify(t)),{
+        id:uid(),
+        subs:(t.subs||[]).map(s=>Object.assign({},s,{id:uid(),done:false}))
+      }));
+    }
+  }
+  return daily();
+}
 function day(k){
-  if(!S.days[k])S.days[k]={tasks:daily(),quota:newQuota()};
+  if(!S.days[k])S.days[k]={tasks:getDailyTasks(),quota:newQuota()};
   const d=S.days[k];
   if(!d.tasks)d.tasks=[];
   if(!d.quota)d.quota=[];
@@ -959,15 +975,6 @@ function taskModal(t){
     const isDaily=draft.badge&&draft.badge.t==="Каждый день";
     if(isNew){
       draft.id=uid();d.tasks.push(draft);
-      // if "каждый день" — add to all future days too
-      if(isDaily){
-        for(let i=1;i<=30;i++){
-          const fk=shift(sel,i),fd=day(fk);
-          if(!fd.tasks.some(x=>x.n===draft.n)){
-            fd.tasks.push(Object.assign({},JSON.parse(JSON.stringify(draft)),{id:uid(),subs:draft.subs.map(s=>Object.assign({},s,{id:uid(),done:false}))}));
-          }
-        }
-      }
     }else{
       const mv=(document.getElementById("mv")||{}).value;
       // if "каждый день" — propagate name/subs/weight changes to all days
