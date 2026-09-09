@@ -4,9 +4,9 @@
 <title>Планер</title>
 <style>
 :root{
-  --ink:#0f1424;--ink2:#4a566e;--mut:#8a94a8;
-  --paper:#EEF0F5;--card:#fff;--line:#d7dbe5;
-  --blue:#2B44E0;--amber:#E8820C;--green:#159A66;--red:#D8391F;
+  --ink:#2d1a24;--ink2:#6b3d54;--mut:#a07088;
+  --paper:#FFE9F6;--card:#fff5fb;--line:#f0c8de;
+  --blue:#c0306b;--amber:#E8820C;--green:#159A66;--red:#c0306b;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
@@ -18,6 +18,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .auth-box{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:36px;
   width:min(440px,100%)}
+.auth-tabs button.on{background:#9b1a4a;color:#fff}
 .auth-box h1{margin:0 0 6px;font-size:26px}
 .auth-box .sub{color:var(--ink2);font-size:15px;margin:0 0 28px}
 .auth-tabs{display:flex;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:24px}
@@ -42,7 +43,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .rule.ok{color:var(--green)}
 .rule::before{content:"○";font-size:10px}
 .rule.ok::before{content:"●";color:var(--green)}
-.btn-full{width:100%;padding:14px;border-radius:12px;border:none;background:var(--ink);color:#fff;
+.btn-full{width:100%;padding:14px;border-radius:12px;border:none;background:#9b1a4a;color:#fff;
   font-size:16px;font-weight:700;margin-top:8px;cursor:pointer;-webkit-appearance:none}
 .btn-full:disabled{opacity:.5;cursor:not-allowed}
 .auth-err{font-size:14px;margin-top:10px;padding:10px 14px;border-radius:8px;display:none}
@@ -115,8 +116,8 @@ h2{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2
 .tname{flex:1;font-weight:700;font-size:16px}
 .tall-cb{width:19px;height:19px;accent-color:var(--blue);flex:none;margin-top:2px;cursor:pointer}
 .badge{font-size:10px;letter-spacing:.07em;text-transform:uppercase;padding:3px 7px;border-radius:5px;font-weight:800;white-space:nowrap;flex:none}
-.b-red{background:#ffe4e0;color:var(--red)}.b-amber{background:#fdf0dc;color:var(--amber)}
-.b-grey{background:#eceff5;color:var(--ink2)}.b-blue{background:#e5e8fd;color:var(--blue)}
+.b-red{background:#ffd6e7;color:#9b1a4a}.b-amber{background:#fdf0dc;color:var(--amber)}
+.b-grey{background:#f5e0ed;color:var(--ink2)}.b-blue{background:#ffe0f2;color:#9b1a4a}
 .tools{display:flex;gap:3px;flex:none}
 .tools button{border:1px solid var(--line);background:#f4f6fa;border-radius:7px;width:27px;height:27px;font-size:12px;padding:0}
 .meta{margin:7px 0 0 56px;font-size:12px;color:var(--mut);display:flex;gap:12px;flex-wrap:wrap}
@@ -243,7 +244,7 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
     <div class="f"><label>Пароль</label>
       <div class="pass-row">
         <input type="password" id="aPass" placeholder="минимум 8 символов">
-        <button class="pass-gen" id="genBtn" type="button">Сгенерировать</button>
+        <button class="pass-gen" id="genBtn" type="button" style="display:none">Сгенерировать</button>
       </div>
       <div class="strength" id="strength">
         <div class="strength-bar"><i id="strengthBar"></i></div>
@@ -269,9 +270,11 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
 <div class="wrap">
   <div class="head">
     <div class="pager">
-      <button class="nav" id="prev">‹</button>
-      <div class="dt" id="dt"></div>
-      <button class="nav" id="next">›</button>
+      <div style="display:flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)">
+        <button class="nav" id="prev" style="border:none;border-radius:0;border-right:1px solid var(--line)">‹</button>
+        <div class="dt" id="dt" style="padding:0 14px"></div>
+        <button class="nav" id="next" style="border:none;border-radius:0;border-left:1px solid var(--line)">›</button>
+      </div>
       <button class="tb" id="tobtn">сегодня</button>
       <button class="tb" id="goalsbtn">цели</button>
       <button class="tb" id="databtn">данные</button>
@@ -323,7 +326,7 @@ const SHORT=["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
 const MONTHS=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 const IMP=[["hi","Очень важно"],["mid","Важно"],["low","Не важно"]];
 const URG=[["hi","Очень срочно"],["mid","Средней срочности"],["low","Не срочно"]];
-const BADGES=[{t:"Обязательно сейчас",c:"b-red"},{t:"До вечера",c:"b-amber"},{t:"Можно перенести",c:"b-grey"},{t:"Каждый день",c:"b-blue"}];
+const BADGES=[{t:"Обязательно сейчас",c:"b-red"},{t:"До конца дня",c:"b-amber"},{t:"Можно перенести",c:"b-grey"},{t:"Каждый день",c:"b-blue"}];
 const SUGGEST={"hi-hi":22,"hi-mid":16,"hi-low":12,"mid-hi":14,"mid-mid":10,"mid-low":7,"low-hi":8,"low-mid":5,"low-low":3};
 const DOW=[[1,"Пн"],[2,"Вт"],[3,"Ср"],[4,"Чт"],[5,"Пт"],[6,"Сб"],[0,"Вс"]];
 
@@ -383,10 +386,8 @@ function scheduleSave(){
 
 /* ---------- state ---------- */
 const defaultRules=()=>[
-  {id:uid(),qid:"ob",n:"Обычные ролики",amount:2,mode:"weekdays",days:[1,3,5],on:2,off:2,every:2,start:todayKey()},
-  {id:uid(),qid:"ob",n:"Обычные ролики",amount:3,mode:"weekdays",days:[2,4,6,0],on:2,off:2,every:2,start:todayKey()},
-  {id:uid(),qid:"rz",n:"Разговорные ролики",amount:3,mode:"weekdays",days:[1,3,5,0],on:2,off:2,every:2,start:todayKey()},
-  {id:uid(),qid:"ch",n:"Челлендж",amount:1,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()}
+  {id:uid(),qid:"ob",n:"Обычные ролики",amount:2,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()},
+  {id:uid(),qid:"ch",n:"Челлендж",amount:1,mode:"everyN",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()}
 ];
 function seed(){
   return{days:{},bonus:[
@@ -496,14 +497,10 @@ function prog(t){const tot=t.subs.reduce((a,s)=>a+(+s.u||0),0)||1;return t.subs.
 
 /* ---------- weekly reset ---------- */
 function maybeWeeklyReset(){
+  // Only track weekStart for motivation feature — don't clear any data
   const tk=todayKey(),d=dateOf(tk),dow=d.getDay();
   const mon=shift(tk,-((dow+6)%7));
-  if(S.weekStart===mon)return;
   S.weekStart=mon;
-  // clear skipped debts from previous weeks
-  Object.keys(S.days).forEach(k=>{
-    if(k<mon)(S.days[k].quota||[]).forEach(q=>q.skipped=q.extra=q.moved=0);
-  });
 }
 
 /* ---------- AUTH ---------- */
@@ -565,6 +562,7 @@ function setAuthMode(m){
   g('aPass2wrap').style.display=isReg?'block':'none';
   g('aBtn').textContent=isReg?'Создать аккаунт':'Войти';
   g('strength').classList.toggle('on',isReg);
+  g('genBtn').style.display=isReg?'block':'none';
   showAuthMsg('','');
 }
 g('tabLogin').addEventListener('click',function(){setAuthMode('login')});
@@ -668,12 +666,47 @@ function render(){
   renderDream();renderWeek();renderWeekStats();renderTasks();renderBonus();renderSocials();
 }
 
+const MOTIV=[
+  "Маленький шаг сегодня — большой прыжок через год.",
+  "Не нужно быть идеальной. Нужно быть немного лучше, чем вчера.",
+  "Каждое «сделано» важнее любого «потом».",
+  "Ты уже справлялась с вещами, которые казались невозможными.",
+  "Прогресс — это не прямая линия. Это всё равно вперёд.",
+  "Один ролик. Одна задача. Один шаг. Потом ещё один.",
+  "Дисциплина — это просто делать то, что решила, даже когда не хочется.",
+  "Будущая ты скажет спасибо за то, что ты делаешь сейчас.",
+  "Рутина — это не скучно. Рутина — это сила.",
+  "Ты строишь что-то настоящее. Это требует времени.",
+  "Не сравнивай свой день 1 с чьим-то днём 1000.",
+  "Сделай хотя бы одно важное дело — и день уже не зря.",
+  "Энергия не бесконечна. Трать её на то, что ведёт вперёд.",
+  "Каждый выложенный ролик — это доказательство, что ты не сдалась.",
+  "Хаос снаружи не повод для хаоса внутри.",
+  "Ты умнее, чем думаешь, и сильнее, чем чувствуешь.",
+  "Финансы, контент, учёба — всё это кирпичики. Ты строишь дом.",
+  "Даже 20 минут работы лучше нуля.",
+  "Не ждать идеального момента — и есть идеальный момент.",
+  "Сегодня — это завтрашнее вчера. Не потеряй его."
+];
+function getTodayQuote(){
+  const d=dateOf(todayKey());
+  const idx=(d.getFullYear()*366+d.getMonth()*31+d.getDate())%MOTIV.length;
+  return MOTIV[idx];
+}
+
 function renderDream(){
   const box=document.getElementById("dreambox");
   const dream=S.profile.goals.find(g=>g.dream);
-  if(!dream||S.profile.dreamHidden===todayKey()){box.innerHTML="";return}
-  box.innerHTML='<div class="dream"><span>✦</span><div>Ради чего всё: <b>'+esc(dream.t)+'</b></div><button>×</button></div>';
-  box.querySelector("button").onclick=()=>{S.profile.dreamHidden=todayKey();scheduleSave();renderDream()};
+  const quote=getTodayQuote();
+  let html='<div style="margin-bottom:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px;color:var(--ink2);font-style:italic">'+
+    '✨ '+esc(quote)+'</div>';
+  if(dream&&S.profile.dreamHidden!==todayKey()){
+    html='<div class="dream"><span>✦</span><div>Ради чего всё: <b>'+esc(dream.t)+'</b></div><button>×</button></div>'+html;
+    box.innerHTML=html;
+    box.querySelector(".dream button").onclick=()=>{S.profile.dreamHidden=todayKey();scheduleSave();renderDream()};
+  }else{
+    box.innerHTML=html;
+  }
 }
 
 function renderWeek(){
@@ -791,8 +824,7 @@ function renderTasks(){
       '<div class="tname">'+esc(t.n)+'</div>'+
       (t.badge?'<span class="badge '+t.badge.c+'">'+esc(t.badge.t)+'</span>':'')+
       '<div class="tools"><button data-e="ed" title="Редактировать">✎</button><button data-e="del" title="Удалить">🗑</button></div></div>'+
-      '<div class="meta">'+(impL?'<span>'+impL+'</span>':'')+(urgL?'<span>'+urgL+'</span>':'')+
-      '<span>'+Math.round(p)+'%</span></div>'+
+      '<div class="meta">'+(impL?'<span>'+impL+'</span>':'')+(urgL?'<span>'+urgL+'</span>':'')+(hasRealSubs?'<span>'+Math.round(p)+'%</span>':'')+'</div>'+
       '<div class="subs'+(t.grid?" grid":"")+'"></div>';
     // master checkbox
     el.querySelector(".tall-cb").onchange=e=>{t.subs.forEach(s=>s.done=e.target.checked);scheduleSave();render()};
@@ -914,12 +946,26 @@ function renderSocials(){
 
 function socialModal(soc){
   const isNew=!soc;
-  const d=soc||{id:uid(),name:"",handle:"",color:"#2B44E0",entries:[]};
+  const d=soc||{id:uid(),name:"",handle:"",color:"#c0306b",entries:[]};
+  const entries=d.entries||[];
+  const histHtml=entries.length?'<div class="mf"><label>История записей</label>'+
+    '<div style="max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px">'+
+    entries.slice().reverse().slice(0,20).map((e,ri)=>{
+      const i=entries.length-1-ri;
+      return'<div class="subrow" style="margin-bottom:6px"><input type="date" data-di="'+i+'" value="'+e.d+'" style="width:130px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px">'+
+        '<input type="number" data-vi="'+i+'" value="'+e.v+'" style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px">'+
+        '<button data-ri="'+i+'" style="padding:0 8px;height:34px;border:1px solid var(--line);border-radius:8px;background:#f5e0ed;cursor:pointer">×</button></div>';
+    }).join("")+'</div></div>':'';
   openModal('<h3>'+(isNew?"Новая соцсеть":"Редактировать")+'</h3>'+
     '<div class="mf"><label>Название</label><input type="text" id="sn" value="'+esc(d.name)+'" placeholder="YouTube"></div>'+
-    '<div class="mf"><label>Цвет</label><input type="color" id="sc" value="'+(d.color||"#2B44E0")+'" style="height:40px;width:80px;padding:4px;border-radius:8px;border:1px solid var(--line)"></div>'+
-    '<div class="acts">'+(isNew?"":'<button class="del" id="sdel">Удалить</button>')+
+    '<div class="mf"><label>Цвет</label><input type="color" id="sc" value="'+(d.color||"#c0306b")+'" style="height:40px;width:80px;padding:4px;border-radius:8px;border:1px solid var(--line)"></div>'+
+    histHtml+
+    '<div class="acts">'+(isNew?"":'<button class="del" id="sdel">Удалить соцсеть</button>')+
     '<button data-x>Отмена</button><button class="go" id="sgo">'+(isNew?"Добавить":"Сохранить")+'</button></div>');
+  // history editing
+  document.querySelectorAll("[data-di]").forEach(el=>el.onchange=e=>{d.entries[+el.dataset.di].d=e.target.value});
+  document.querySelectorAll("[data-vi]").forEach(el=>el.onchange=e=>{d.entries[+el.dataset.vi].v=+e.target.value});
+  document.querySelectorAll("[data-ri]").forEach(el=>el.onclick=()=>{d.entries.splice(+el.dataset.ri,1);closeModal();socialModal(soc);scheduleSave();render()});
   if(!isNew)document.getElementById("sdel").onclick=()=>{S.socials=S.socials.filter(x=>x.id!==soc.id);closeModal();scheduleSave();render()};
   document.getElementById("sgo").onclick=()=>{
     d.name=document.getElementById("sn").value.trim()||"Соцсеть";
@@ -1053,19 +1099,28 @@ function carryModal(k){
 
 function undoCarryModal(k){
   const list=(S.carries||[]).filter(c=>c.from===k||c.to===k);
-  openModal('<h3>Отменить перенос</h3><p class="lead">Выбери что вернуть назад.</p>'+
-    '<div id="clist">'+list.map(c=>'<div class="subrow"><span style="flex:1">'+c.amount+' '+esc(c.n)+' · '+SHORT[dateOf(c.from).getDay()]+'→'+SHORT[dateOf(c.to).getDay()]+'</span>'+
-      '<button class="smalladd" data-c="'+c.id+'" style="width:auto;padding:6px 12px;margin:0">вернуть</button></div>').join("")+'</div>'+
-    '<div class="acts"><button data-x>Закрыть</button></div>');
-  document.querySelectorAll("#clist [data-c]").forEach(b=>b.onclick=()=>{
-    const c=(S.carries||[]).find(x=>x.id===b.dataset.c);if(!c)return;
-    const f=day(c.from).quota.find(q=>q.id===c.qid);
-    const t=day(c.to).quota.find(q=>q.id===c.qid);
-    if(f)f.moved=Math.max(0,(f.moved||0)-c.amount);
-    if(t)t.extra=Math.max(0,(t.extra||0)-c.amount);
-    S.carries=S.carries.filter(x=>x.id!==c.id);
+  if(!list.length){toast("Нет активных переносов для этого дня.");return}
+  openModal('<h3>Отменить перенос</h3>'+
+    '<p class="lead">Выбери что вернуть. Норма вернётся в исходный день, долг исчезнет.</p>'+
+    '<div style="margin-bottom:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600">'+
+    '<input type="checkbox" id="selAll" style="width:18px;height:18px"> Выбрать всё</label></div>'+
+    '<div id="clist">'+list.map(c=>'<div class="subrow" style="align-items:center"><label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer">'+
+      '<input type="checkbox" class="ci" data-c="'+c.id+'" style="width:16px;height:16px">'+
+      '<span>'+c.amount+' '+esc(c.n)+' · '+SHORT[dateOf(c.from).getDay()]+'→'+SHORT[dateOf(c.to).getDay()]+'</span></label></div>').join("")+'</div>'+
+    '<div class="acts"><button data-x>Отмена</button><button class="go" id="undogo">Вернуть выбранное</button></div>');
+  document.getElementById("selAll").onchange=e=>{
+    document.querySelectorAll(".ci").forEach(cb=>cb.checked=e.target.checked)};
+  document.getElementById("undogo").onclick=()=>{
+    document.querySelectorAll(".ci:checked").forEach(cb=>{
+      const c=(S.carries||[]).find(x=>x.id===cb.dataset.c);if(!c)return;
+      const f=day(c.from).quota.find(q=>q.id===c.qid);
+      const t=day(c.to).quota.find(q=>q.id===c.qid);
+      if(f)f.moved=Math.max(0,(f.moved||0)-c.amount);
+      if(t)t.extra=Math.max(0,(t.extra||0)-c.amount);
+      S.carries=S.carries.filter(x=>x.id!==c.id);
+    });
     closeModal();scheduleSave();render();toast("Перенос отменён.");
-  });
+  };
 }
 
 
@@ -1182,7 +1237,19 @@ function weeklyMotivation(){
 /* ---------- rewards ---------- */
 const JOY_MAP=[[/^(гуля|погуля|прогул)/,"надеть наушники и пройтись любимым маршрутом"],[/коф/,"дойти до кофейни и взять что-нибудь с собой"],[/чай/,"заварить чай и посидеть без телефона"],[[/(чита|книг)/,"забраться с книгой куда-нибудь помягче"]],[/(сериал|фильм|кино)/,"поставить серию и никуда не торопиться"],[/(ванн|душ)/,"устроить долгую ванну"],[/(сплю|сон|поспа)/,"лечь пораньше и выспаться без будильника"],[/(бега|пробеж|теннис|спорт)/,"размяться и выдохнуть"],[/(пекарн|десерт|сладк|мороже)/,"дойти до пекарни за чем-нибудь тёплым"],[/(канцеляр|блокнот|шопинг)/,"зайти и купить себе что-нибудь маленькое"]];
 function joyPhrase(raw){const s=(raw||"").toLowerCase().trim();for(const[re,out]of JOY_MAP)if(re.test&&re.test(s))return out;return"порадовать себя: "+s}
-function reward(n){const j=S.profile.joys||[];const pick=j.length?joyPhrase(j[Math.floor(Math.random()*j.length)]):null;const h=new Date().getHours();const when=h<12?"Утро":h<17?"День":h<21?"Вечер":"Ночь";const praise=n===1?"Первая необязательная — та, что можно было не трогать.":n<4?"Уже "+n+" сверх плана — это заметно.":"Ты закрыла "+n+" необязательных. Их вообще не нужно было делать сегодня.";toast(praise+(pick?" "+when+" — самое время "+pick+".":""))}
+function reward(n){
+  const j=S.profile.joys||[];
+  const pick=j.length?joyPhrase(j[Math.floor(Math.random()*j.length)]):null;
+  const h=new Date().getHours();
+  const when=h<12?"Утро хорошее — можно "+( pick||"порадовать себя"):
+    h<17?"Посреди дня самое время "+( pick||"сделать паузу"):
+    h<21?"Вечер — заслуженный момент "+( pick||"для себя"):
+    "Поздно, но ты молодец — "+( pick||"время отдохнуть");
+  const praise=n===1?"Первое необязательное закрыто — то, что вообще-то можно было оставить.":
+    n<4?n+" задачи сверх плана. Это уже не случайность.":
+    n+" необязательных за день. Их вообще не нужно было делать — но ты сделала.";
+  toast(praise+" "+when+".");
+}
 
 /* ---------- data transfer ---------- */
 document.getElementById("databtn").onclick=()=>{
