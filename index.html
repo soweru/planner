@@ -270,11 +270,11 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
 <div class="wrap">
   <div class="head">
     <div class="pager">
-      <div style="display:flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)">
-        <button class="nav" id="prev" style="border:none;border-radius:0;border-right:1px solid var(--line)">‹</button>
-        <div class="dt" id="dt" style="padding:0 14px"></div>
-        <button class="nav" id="next" style="border:none;border-radius:0;border-left:1px solid var(--line)">›</button>
+      <div style="display:flex;align-items:center;gap:0">
+        <button class="nav" id="prev" style="border-radius:10px 0 0 10px;border-right:none">‹</button>
+        <button class="nav" id="next" style="border-radius:0 10px 10px 0;border-left:none">›</button>
       </div>
+      <div class="dt" id="dt"></div>
       <button class="tb" id="tobtn">сегодня</button>
       <button class="tb" id="goalsbtn">цели</button>
       <button class="tb" id="databtn">данные</button>
@@ -362,19 +362,29 @@ async function loadFromDB(){
 }
 async function saveToDB(){
   if(!user||!S)return;
-  var payload={user_id:user.id,data:S};
-  var body=JSON.stringify(payload);
-  // always backup locally first
+  var body=JSON.stringify({user_id:user.id,data:S});
+  // always save locally first as backup
   try{localStorage.setItem(KEY+'_'+user.id,body)}catch(e){}
   try{
-    // DELETE old rows then INSERT fresh — avoids upsert conflicts entirely
-    await fetch(SB_URL+'/rest/v1/planner_data?user_id=eq.'+user.id,
-      {method:'DELETE',headers:sbHeaders()});
-    var ri=await fetch(SB_URL+'/rest/v1/planner_data',
-      {method:'POST',headers:sbHeaders({'Prefer':'return=minimal'}),body:body});
-    if(!ri.ok){
-      var t=await ri.text();
-      console.error('saveToDB insert failed',ri.status,t);
+    // try PATCH (update existing row)
+    var rp=await fetch(SB_URL+'/rest/v1/planner_data?user_id=eq.'+user.id,{
+      method:'PATCH',
+      headers:sbHeaders({'Prefer':'return=minimal','Content-Type':'application/json'}),
+      body:body
+    });
+    // if PATCH updated 0 rows (no existing row), do INSERT
+    if(rp.ok){
+      var cr=rp.headers.get('content-range')||'';
+      if(cr==='*/*'||cr===''||cr==='0-0/0'){
+        var ri=await fetch(SB_URL+'/rest/v1/planner_data',{
+          method:'POST',
+          headers:sbHeaders({'Prefer':'return=minimal','Content-Type':'application/json'}),
+          body:body
+        });
+        if(!ri.ok)console.error('insert failed',ri.status,await ri.text());
+      }
+    }else{
+      console.error('patch failed',rp.status,await rp.text());
     }
   }catch(e){console.error('saveToDB',e)}
 }
@@ -698,14 +708,26 @@ function renderDream(){
   const box=document.getElementById("dreambox");
   const dream=S.profile.goals.find(g=>g.dream);
   const quote=getTodayQuote();
-  let html='<div style="margin-bottom:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px;color:var(--ink2);font-style:italic">'+
-    '✨ '+esc(quote)+'</div>';
+  const shownToday=S.profile.quoteShown===todayKey();
+  // show quote as popup once per day
+  if(!shownToday){
+    S.profile.quoteShown=todayKey();
+    setTimeout(()=>{
+      openModal('<div style="text-align:center;padding:10px 0">'+
+        '<div style="font-size:32px;margin-bottom:16px">✨</div>'+
+        '<div style="font-size:18px;font-weight:600;color:var(--ink);line-height:1.4;margin-bottom:20px">'+esc(quote)+'</div>'+
+        (dream?'<div style="font-size:14px;color:var(--ink2);margin-bottom:20px">Ради чего всё: <b>'+esc(dream.t)+'</b></div>':'')+
+        '</div>'+
+        '<div class="acts" style="justify-content:center"><button class="go" data-x style="background:#9b1a4a">Начать день</button></div>');
+      scheduleSave();
+    },500);
+  }
+  // dream banner stays on screen
   if(dream&&S.profile.dreamHidden!==todayKey()){
-    html='<div class="dream"><span>✦</span><div>Ради чего всё: <b>'+esc(dream.t)+'</b></div><button>×</button></div>'+html;
-    box.innerHTML=html;
-    box.querySelector(".dream button").onclick=()=>{S.profile.dreamHidden=todayKey();scheduleSave();renderDream()};
+    box.innerHTML='<div class="dream"><span>✦</span><div>Ради чего всё: <b>'+esc(dream.t)+'</b></div><button>×</button></div>';
+    box.querySelector("button").onclick=()=>{S.profile.dreamHidden=todayKey();scheduleSave();renderDream()};
   }else{
-    box.innerHTML=html;
+    box.innerHTML="";
   }
 }
 
@@ -821,7 +843,7 @@ function renderTasks(){
     el.innerHTML='<div class="thead"><span class="grip">⠿</span>'+
       '<div class="w">'+t.w+'%</div>'+
       '<input type="checkbox" class="tall-cb" title="Выполнить всё"'+(allDone?" checked":"")+'>'+
-      '<div class="tname">'+esc(t.n)+'</div>'+
+      '<div class="tname" style="'+(hasRealSubs?'':'font-size:17px;font-weight:700;')+'">'+esc(t.n)+'</div>'+
       (t.badge?'<span class="badge '+t.badge.c+'">'+esc(t.badge.t)+'</span>':'')+
       '<div class="tools"><button data-e="ed" title="Редактировать">✎</button><button data-e="del" title="Удалить">🗑</button></div></div>'+
       '<div class="meta">'+(impL?'<span>'+impL+'</span>':'')+(urgL?'<span>'+urgL+'</span>':'')+(hasRealSubs?'<span>'+Math.round(p)+'%</span>':'')+'</div>'+
