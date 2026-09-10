@@ -305,8 +305,11 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
         <button class="smalladd" id="addbonus">+ Добавить необязательное</button>
       </div>
       <div class="panel">
-        <h2>Соцсети</h2>
-        <div class="socials" id="socials"></div>
+        <h2>Соцсети
+          <button class="h2btn" id="socTabAll">Общий график</button>
+          <button class="h2btn" id="socTabEdit">+ Добавить</button>
+        </h2>
+        <div id="socials"></div>
       </div>
     </div>
   </div>
@@ -410,7 +413,7 @@ function seed(){
     {id:uid(),name:"Telegram",handle:"soweru",color:"#229ED9",entries:[]},
     {id:uid(),name:"Instagram",handle:"soweru",color:"#E1306C",entries:[]}
   ],profile:{onboarded:false,goals:[],joys:[],about:"",lastAsk:null,dreamShown:null,dreamHidden:null},
-  carries:[],rules:defaultRules(),weekStart:null};
+  carries:[],rules:defaultRules(),weekStart:null,dayTemplate:null};
 }
 function migrate(o){
   if(!o||typeof o!=="object")return seed();
@@ -419,6 +422,7 @@ function migrate(o){
   s.carries=o.carries||[];
   s.rules=o.rules||defaultRules();
   s.archive=o.archive||[];
+  s.dayTemplate=o.dayTemplate||null;
   s.socials=o.socials||s.socials;
   s.weekStart=o.weekStart||null;
   if(o.bonus&&Array.isArray(o.bonus)){
@@ -478,20 +482,30 @@ function daily(){
 }
 const newQuota=()=>[];
 function getDailyTasks(){
-  // find most recent day that has tasks with "Каждый день" badge
+  // Use stored template if exists, otherwise find from recent days
+  if(S.dayTemplate&&S.dayTemplate.length){
+    return S.dayTemplate.map(t=>Object.assign({},JSON.parse(JSON.stringify(t)),{
+      id:uid(),subs:(t.subs||[]).map(s=>Object.assign({},s,{id:uid(),done:false}))
+    }));
+  }
   const keys=Object.keys(S.days).sort().reverse();
   for(const k of keys){
     const tasks=(S.days[k]&&S.days[k].tasks)||[];
     const dailyOnes=tasks.filter(t=>t.badge&&t.badge.t==="Каждый день");
     if(dailyOnes.length>0){
-      // return all tasks from that day, but reset done state
       return tasks.map(t=>Object.assign({},JSON.parse(JSON.stringify(t)),{
-        id:uid(),
-        subs:(t.subs||[]).map(s=>Object.assign({},s,{id:uid(),done:false}))
+        id:uid(),subs:(t.subs||[]).map(s=>Object.assign({},s,{id:uid(),done:false}))
       }));
     }
   }
   return daily();
+}
+function updateDayTemplate(){
+  // Save today's task structure as template for future days
+  const todayTasks=S.days[todayKey()]&&S.days[todayKey()].tasks;
+  if(todayTasks&&todayTasks.length){
+    S.dayTemplate=JSON.parse(JSON.stringify(todayTasks));
+  }
 }
 function day(k){
   if(!S.days[k])S.days[k]={tasks:getDailyTasks(),quota:newQuota()};
@@ -901,70 +915,112 @@ function renderBonus(){
 function renderSocials(){
   const box=document.getElementById("socials");box.innerHTML="";
   const period=S.socialPeriod||30;
+  const cutoff=shift(todayKey(),-period);
+
   // period tabs
   const tabs=document.createElement("div");
-  tabs.style.cssText="grid-column:1/-1;display:flex;gap:6px;margin-bottom:4px";
+  tabs.style.cssText="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap";
   [7,30,90,365].forEach(p=>{
     const b=document.createElement("button");
     b.textContent=p===7?"7 дн":p===30?"30 дн":p===90?"3 мес":"год";
-    b.style.cssText="padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:"+(p===period?"var(--ink)":"#f5f7fb")+";color:"+(p===period?"#fff":"var(--ink2)")+";font-size:13px;cursor:pointer";
+    b.style.cssText="padding:5px 10px;border-radius:8px;border:1px solid var(--line);font-size:13px;cursor:pointer;"+
+      "background:"+(p===period?"#9b1a4a":"#f5f0f3")+";color:"+(p===period?"#fff":"var(--ink2)");
     b.onclick=()=>{S.socialPeriod=p;scheduleSave();renderSocials()};
     tabs.appendChild(b);
   });
   box.appendChild(tabs);
 
-  (S.socials||[]).forEach(soc=>{
-    const entries=soc.entries||[];
-    const cutoff=shift(todayKey(),-period);
-    const recent=entries.filter(e=>e.d>=cutoff);
-    const last=entries[entries.length-1];
-    const first=recent[0];
-    const val=last?last.v:null;
-    const delta=last&&first&&first!==last?last.v-first.v:null;
+  const socs=S.socials||[];
+  if(!socs.length){
+    box.innerHTML+='<div style="color:var(--mut);font-size:14px;text-align:center;padding:20px 0">Добавь соцсети через кнопку выше</div>';
+    return;
+  }
 
-    const el=document.createElement("div");el.className="soc";
-    el.style.cursor="pointer";
+  // Table: rows = dates, columns = networks
+  const allDates=[...new Set(socs.flatMap(s=>(s.entries||[]).map(e=>e.d)))].filter(d=>d>=cutoff).sort();
 
-    // sparkline SVG
-    let sparkHtml="";
-    if(recent.length>=2){
-      const W=130,H=40,vals=recent.map(e=>e.v);
-      const mn=Math.min(...vals),mx=Math.max(...vals),range=mx-mn||1;
-      const pts=recent.map((e,i)=>{
-        const x=Math.round(i/(recent.length-1)*(W-4)+2);
-        const y=Math.round(H-2-(e.v-mn)/range*(H-4));
-        return x+","+y;
+  if(allDates.length){
+    const tbl=document.createElement("div");
+    tbl.style.cssText="overflow-x:auto;margin-bottom:14px";
+    let html='<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<thead><tr><th style="text-align:left;padding:6px 8px;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--line)">Дата</th>'+
+      socs.map(s=>'<th style="text-align:right;padding:6px 8px;color:'+(s.color||"var(--blue)")+';font-weight:700;border-bottom:1px solid var(--line)">'+esc(s.name)+'</th>').join("")+
+      '</tr></thead><tbody>';
+    allDates.slice().reverse().forEach(date=>{
+      html+='<tr><td style="padding:6px 8px;color:var(--ink2);white-space:nowrap">'+shortHuman(date)+'</td>'+
+        socs.map(s=>{
+          const e=(s.entries||[]).find(x=>x.d===date);
+          return'<td style="text-align:right;padding:6px 8px;font-family:var(--mono)">'+
+            (e!=null?e.v.toLocaleString("ru"):'<span style="color:var(--mut)">—</span>')+'</td>';
+        }).join("")+'</tr>';
+    });
+    html+='</tbody></table>';
+    tbl.innerHTML=html;
+    box.appendChild(tbl);
+
+    // Combined SVG graph
+    if(allDates.length>=2){
+      const W=box.clientWidth||260,H=90;
+      const COLORS=socs.map(s=>s.color||"#9b1a4a");
+      let svgLines="";
+      socs.forEach((soc,si)=>{
+        const pts=allDates.map((d,i)=>{
+          const e=(soc.entries||[]).find(x=>x.d===d);
+          return e!=null?e.v:null;
+        });
+        const valid=pts.filter(v=>v!=null);
+        if(valid.length<2)return;
+        const mn=Math.min(...valid),mx=Math.max(...valid),range=mx-mn||1;
+        const coords=[];
+        pts.forEach((v,i)=>{
+          if(v==null)return;
+          const x=Math.round(i/(allDates.length-1)*(W-20)+10);
+          const y=Math.round(H-8-(v-mn)/range*(H-16));
+          coords.push(x+","+y);
+        });
+        if(coords.length>=2)
+          svgLines+='<polyline points="'+coords.join(" ")+'" fill="none" stroke="'+COLORS[si]+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>';
       });
-      const col=soc.color||"#2B44E0";
-      sparkHtml='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="display:block;margin-top:6px">'+
-        '<polyline points="'+pts.join(" ")+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'+
-        '</svg>';
-    }else if(recent.length===1){
-      sparkHtml='<div style="font-size:11px;color:var(--mut);margin-top:6px">Нужно ещё одно обновление для графика</div>';
-    }else{
-      sparkHtml='<div style="font-size:11px;color:var(--mut);margin-top:6px">Пока нет данных за этот период</div>';
+      if(svgLines){
+        const legend=socs.map((s,i)=>'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-right:10px">'+
+          '<span style="display:inline-block;width:12px;height:3px;background:'+(s.color||"#9b1a4a")+';border-radius:2px"></span>'+esc(s.name)+'</span>').join("");
+        const g=document.createElement("div");
+        g.innerHTML='<div style="margin-bottom:6px">'+legend+'</div>'+
+          '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="display:block;overflow:visible">'+svgLines+'</svg>';
+        box.appendChild(g);
+      }
     }
+  }
 
-    el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
-      '<div class="sname">'+esc(soc.name)+'</div>'+
-      '<button class="ed" style="border:none;background:none;color:var(--mut);font-size:12px;cursor:pointer">✎</button></div>'+
-      '<div class="sval" style="color:'+(soc.color||"var(--blue)")+'">'+(val!=null?val.toLocaleString("ru"):"—")+'</div>'+
-      '<div class="sdelta '+(delta==null?"same":delta>0?"up":"dn")+'" style="font-size:12px">'+
-        (delta==null?"нет данных":delta===0?"без изменений":((delta>0?"+":"")+delta.toLocaleString("ru")+" за период"))+'</div>'+
-      sparkHtml+
-      '<input class="sedit" type="number" placeholder="Обновить число" min="0" style="margin-top:8px">';
-    el.querySelector(".ed").onclick=e=>{e.stopPropagation();socialModal(soc)};
-    el.querySelector(".sedit").onchange=e=>{
+  // Input row for today
+  const addRow=document.createElement("div");
+  addRow.style.cssText="margin-top:12px;display:flex;flex-direction:column;gap:6px";
+  socs.forEach(soc=>{
+    const last=(soc.entries||[]).slice(-1)[0];
+    const r=document.createElement("div");
+    r.style.cssText="display:flex;align-items:center;gap:8px";
+    r.innerHTML='<span style="font-size:13px;color:'+(soc.color||"var(--mut)")+';font-weight:700;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(soc.name)+'</span>'+
+      '<span style="font-family:var(--mono);font-size:13px;color:var(--ink2);min-width:60px">'+
+        (last?last.v.toLocaleString("ru"):"—")+'</span>'+
+      '<input type="number" placeholder="новое" min="0" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:var(--card)">'+
+      '<button style="border:none;background:none;color:var(--mut);font-size:13px;cursor:pointer">✎</button>';
+    r.querySelector("input").onchange=e=>{
       const v=+e.target.value;if(isNaN(v)||v<0)return;
       soc.entries=soc.entries||[];
+      // remove duplicate for today if exists
+      soc.entries=soc.entries.filter(x=>x.d!==todayKey());
       soc.entries.push({d:todayKey(),v});
+      soc.entries.sort((a,b)=>a.d<b.d?-1:1);
       if(soc.entries.length>365)soc.entries=soc.entries.slice(-365);
-      e.target.value="";scheduleSave();render();toast(soc.name+": "+v.toLocaleString("ru"))};
-    box.appendChild(el);
+      e.target.value="";scheduleSave();renderSocials();toast(soc.name+": "+v.toLocaleString("ru"))};
+    r.querySelector("button").onclick=()=>socialModal(soc);
+    addRow.appendChild(r);
   });
-  const add=document.createElement("button");add.className="soc-add";add.textContent="+ Добавить соцсеть";
-  add.onclick=()=>socialModal(null);box.appendChild(add);
+  box.appendChild(addRow);
 }
+
+document.getElementById("socTabAll").onclick=()=>{S.socialPeriod=365;scheduleSave();renderSocials()};
+document.getElementById("socTabEdit").onclick=()=>socialModal(null);
 
 function socialModal(soc){
   const isNew=!soc;
@@ -1043,23 +1099,30 @@ function taskModal(t){
     const isDaily=draft.badge&&draft.badge.t==="Каждый день";
     if(isNew){
       draft.id=uid();d.tasks.push(draft);
+      if(isDaily){updateDayTemplate();}
     }else{
       const mv=(document.getElementById("mv")||{}).value;
-      // if "каждый день" — propagate name/subs/weight changes to all days
       if(isDaily){
-        Object.keys(S.days).forEach(k=>{
+        // Update ALL existing future days (from today onwards)
+        Object.keys(S.days).filter(k=>k>=sel).forEach(k=>{
           (S.days[k].tasks||[]).forEach(x=>{
-            if(x.n===t.n||x.id===t.id){
-              x.n=draft.n;x.w=draft.w;x.badge=draft.badge;x.imp=draft.imp;x.urg=draft.urg;
-              // update subs structure but keep done state
+            if(x.n===t.n||x.id===t.id||x.sid===t.sid){
+              x.n=draft.n;x.w=draft.w;x.badge=draft.badge;x.imp=draft.imp;x.urg=draft.urg;x.sid=draft.sid;
               x.subs=draft.subs.map((ds,si)=>{
-                const existing=x.subs[si];
-                return{id:(existing&&existing.id)||uid(),n:ds.n,u:ds.u,done:k===sel?ds.done:(existing?existing.done:false)};
+                const existing=x.subs&&x.subs[si];
+                return{id:(existing&&existing.id)||uid(),n:ds.n,u:ds.u,
+                  done:k===sel?ds.done:(existing?existing.done:false)};
               });
             }
           });
         });
-      }else Object.assign(t,draft);
+        // Also update today's entry directly
+        Object.assign(t,draft);
+        // Update template for future days not yet created
+        updateDayTemplate();
+      }else{
+        Object.assign(t,draft);
+      }
       if(mv&&mv!==sel){deleteModal(t,true,mv)}
     }
     closeModal();scheduleSave();render()};
