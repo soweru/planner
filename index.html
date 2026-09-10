@@ -4,11 +4,13 @@
 <title>Планер</title>
 <style>
 :root{
-  --ink:#2d1a24;--ink2:#6b3d54;--mut:#a07088;
-  --paper:#FFE9F6;--card:#fff5fb;--line:#f0c8de;
-  --blue:#c0306b;--amber:#E8820C;--green:#159A66;--red:#c0306b;
+  --ink:#2d1a24;--ink2:#6b3d54;--mut:#a888a0;
+  --paper:#FFF6FB;--card:#fffcfe;--line:#f2d8e6;
+  --blue:#b02a63;--amber:#E8820C;--green:#159A66;--red:#b02a63;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
+body[data-theme="blue"]{--paper:#F3F9FF;--card:#fbfdff;--line:#d5e6f5;--blue:#2364b0;--red:#2364b0;--ink:#1a2530;--ink2:#3d566b;--mut:#88a0b8}
+body[data-theme="yellow"]{--paper:#FFFDF3;--card:#fffef9;--line:#f0e6c8;--blue:#a8820c;--red:#a8820c;--ink:#2d281a;--ink2:#6b5d3d;--mut:#b8a888}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-size:16px;line-height:1.45;
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:0}
@@ -305,10 +307,7 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
         <button class="smalladd" id="addbonus">+ Добавить необязательное</button>
       </div>
       <div class="panel">
-        <h2>Соцсети
-          <button class="h2btn" id="socTabAll">Общий график</button>
-          <button class="h2btn" id="socTabEdit">+ Добавить</button>
-        </h2>
+        <h2>Соцсети</h2>
         <div id="socials"></div>
       </div>
     </div>
@@ -318,6 +317,11 @@ label.sub.on .txt{color:var(--mut);text-decoration:line-through}
 
 <div class="mask" id="mask"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
+<div id="themeSwitch" style="position:fixed;right:16px;bottom:16px;display:flex;gap:6px;z-index:40">
+  <button data-theme="pink" title="Розовый" style="width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:#FFD6E7;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.15)"></button>
+  <button data-theme="blue" title="Голубой" style="width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:#CFE4FA;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.15)"></button>
+  <button data-theme="yellow" title="Жёлтый" style="width:28px;height:28px;border-radius:50%;border:2px solid #fff;background:#FAF0C0;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.15)"></button>
+</div>
 
 <script>
 var SB_URL='https://dtiwlacligiqyjeeajqo.supabase.co';
@@ -398,9 +402,9 @@ function scheduleSave(){
 }
 
 /* ---------- state ---------- */
-const defaultRules=()=>[
-  {id:uid(),qid:"ob",n:"Обычные ролики",amount:2,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()},
-  {id:uid(),qid:"ch",n:"Челлендж",amount:1,mode:"everyN",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()}
+const defaultQuotaTemplate=()=>[
+  {id:"ob",n:"Обычные",goal:2},
+  {id:"ch",n:"Челлендж",goal:1}
 ];
 function seed(){
   return{days:{},bonus:[
@@ -409,22 +413,29 @@ function seed(){
     {id:uid(),n:"Съездить на море",star:true,due:null,doneOn:null}
   ],archive:[],socials:[
     {id:uid(),name:"YouTube",handle:"soweru",color:"#FF0000",entries:[]},
-    {id:uid(),name:"TikTok",handle:"soweru",color:"#000",entries:[]},
+    {id:uid(),name:"TikTok",handle:"soweru",color:"#111",entries:[]},
     {id:uid(),name:"Telegram",handle:"soweru",color:"#229ED9",entries:[]},
     {id:uid(),name:"Instagram",handle:"soweru",color:"#E1306C",entries:[]}
   ],profile:{onboarded:false,goals:[],joys:[],about:"",lastAsk:null,dreamShown:null,dreamHidden:null},
-  carries:[],rules:defaultRules(),weekStart:null,dayTemplate:null};
+  carries:[],quotaTemplate:defaultQuotaTemplate(),weekStart:null,dayTemplate:null,theme:"pink"};
 }
 function migrate(o){
   if(!o||typeof o!=="object")return seed();
   const s=seed();
   s.days=o.days||{};
   s.carries=o.carries||[];
-  s.rules=o.rules||defaultRules();
   s.archive=o.archive||[];
   s.dayTemplate=o.dayTemplate||null;
   s.socials=o.socials||s.socials;
   s.weekStart=o.weekStart||null;
+  s.theme=o.theme||"pink";
+  // migrate old rules -> quotaTemplate
+  if(o.quotaTemplate){s.quotaTemplate=o.quotaTemplate}
+  else if(o.rules){
+    const seen={};s.quotaTemplate=[];
+    o.rules.forEach(r=>{if(!seen[r.qid]){seen[r.qid]=1;s.quotaTemplate.push({id:r.qid,n:r.n,goal:+r.amount||1})}});
+    if(!s.quotaTemplate.length)s.quotaTemplate=defaultQuotaTemplate();
+  }else s.quotaTemplate=defaultQuotaTemplate();
   if(o.bonus&&Array.isArray(o.bonus)){
     s.bonus=o.bonus.map(b=>({id:b.id||uid(),n:(b.n||"").replace(/^★\s*/,""),star:b.star||/^★/.test(b.n||""),due:b.due||null,doneOn:b.doneOn||null}));
   }
@@ -448,24 +459,22 @@ function migrate(o){
   return s;
 }
 
-/* ---------- repeat rules ---------- */
-function ruleHits(r,k){
-  if(r.mode==="daily")return true;
-  if(r.mode==="weekdays")return(r.days||[]).includes(dateOf(k).getDay());
-  const n=daysBetween(r.start||k,k);
-  if(r.mode==="cycle"){const len=Math.max(1,(+r.on||1)+(+r.off||0));return(((n%len)+len)%len)<(+r.on||1)}
-  if(r.mode==="everyN"){const e=Math.max(1,+r.every||1);return(((n%e)+e)%e)===0}
-  return false;
-}
-function goalFor(qid,k){return(S.rules||[]).filter(r=>r.qid===qid&&ruleHits(r,k)).reduce((a,r)=>a+Math.max(0,+r.amount||0),0)}
+/* ---------- quota system: template applied per day ---------- */
 function applyRules(k,d){
-  const ids=[...new Set((S.rules||[]).map(r=>r.qid))];
-  ids.forEach(qid=>{
-    const rule=(S.rules||[]).find(r=>r.qid===qid);if(!rule)return;
-    let q=d.quota.find(x=>x.id===qid);
-    if(!q){q={id:qid,n:rule.n,goal:0,done:0,moved:0,extra:0,skipped:0};d.quota.push(q)}
-    q.n=rule.n;
-    if(!q.manual)q.goal=goalFor(qid,k);
+  // Each day gets quota rows from the template. Existing done/carry state preserved.
+  (S.quotaTemplate||[]).forEach(tpl=>{
+    let q=d.quota.find(x=>x.id===tpl.id);
+    if(!q){
+      // only auto-add template rows to today and future days
+      if(k>=todayKey()){
+        q={id:tpl.id,n:tpl.n,goal:tpl.goal,done:0,moved:0,extra:0,skipped:0};
+        d.quota.push(q);
+      }
+    }else{
+      // keep name in sync with template unless manually renamed
+      if(!q.manualName)q.n=tpl.n;
+      if(!q.manual)q.goal=tpl.goal;
+    }
   });
 }
 const need=q=>Math.max(0,(+q.goal||0)-(q.moved||0)+(q.extra||0)-(q.skipped||0));
@@ -562,6 +571,7 @@ async function startApp(u){
     }catch(e){}
   }
   S=raw?migrate(raw):seed();
+  if(S.theme)document.body.setAttribute("data-theme",S.theme);
   sel=todayKey();
   maybeWeeklyReset();
   render();
@@ -785,21 +795,60 @@ function renderWeek(){
 
 function quotaModal(k){
   const d=day(k);
+  const isFuture=k>=todayKey();
   const draw=()=>{
     openModal('<h3>План на '+human(k).toLowerCase()+'</h3>'+
-      '<p class="lead">Измени план этого дня: переименуй показатель, поправь число или убери крестиком. Крестик убирает только в этот день — в остальных всё остаётся.</p>'+
+      '<p class="lead">Меняй количество стрелками или числом. Изменения применяются '+(isFuture?'к этому дню и всем будущим':'только к этому дню')+'. Крестик полностью удаляет показатель.</p>'+
       '<div id="ql">'+d.quota.map((q,i)=>'<div class="subrow">'+
         '<input type="text" data-n="'+i+'" value="'+esc(q.n)+'" style="flex:1">'+
         '<input type="number" data-g="'+i+'" min="0" value="'+q.goal+'" style="width:75px">'+
-        (q.manual?'<button data-rst="'+i+'" style="padding:0 8px" title="Вернуть к повтору">↺</button>':'')+
-        '<button data-rm="'+i+'" style="padding:0 8px">×</button></div>').join("")+'</div>'+
+        '<button data-rm="'+i+'" style="padding:0 10px" title="Удалить показатель">×</button></div>').join("")+'</div>'+
       '<button class="smalladd" id="qadd" style="width:auto;padding:9px 16px;margin-top:8px">+ добавить показатель</button>'+
       '<div class="acts"><button class="go" data-x>Готово</button></div>');
-    document.querySelectorAll("#ql [data-n]").forEach(el=>el.oninput=e=>{d.quota[+el.dataset.n].n=e.target.value;scheduleSave()});
-    document.querySelectorAll("#ql [data-g]").forEach(el=>el.oninput=e=>{const q=d.quota[+el.dataset.g];q.goal=Math.max(0,+e.target.value||0);q.manual=true;scheduleSave();renderWeek()});
-    document.querySelectorAll("#ql [data-rst]").forEach(el=>el.onclick=()=>{delete d.quota[+el.dataset.rst].manual;scheduleSave();render();draw()});
-    document.querySelectorAll("#ql [data-rm]").forEach(el=>el.onclick=()=>{d.quota.splice(+el.dataset.rm,1);scheduleSave();render();draw()});
-    document.getElementById("qadd").onclick=()=>{d.quota.push({id:uid(),n:"Новый показатель",goal:1,done:0,moved:0,extra:0,skipped:0,manual:true});scheduleSave();render();draw()};
+    // edit name
+    document.querySelectorAll("#ql [data-n]").forEach(el=>el.oninput=e=>{
+      const q=d.quota[+el.dataset.n];q.n=e.target.value;q.manualName=true;
+      // sync to template + future days
+      const tpl=(S.quotaTemplate||[]).find(x=>x.id===q.id);
+      if(tpl&&isFuture){tpl.n=e.target.value;
+        Object.keys(S.days).filter(dk=>dk>=k).forEach(dk=>{
+          const fq=S.days[dk].quota.find(x=>x.id===q.id);if(fq&&!fq.manualName)fq.n=e.target.value;});
+      }
+      scheduleSave();
+    });
+    // edit goal
+    document.querySelectorAll("#ql [data-g]").forEach(el=>el.oninput=e=>{
+      const q=d.quota[+el.dataset.g];q.goal=Math.max(0,+e.target.value||0);
+      if(isFuture){
+        const tpl=(S.quotaTemplate||[]).find(x=>x.id===q.id);
+        if(tpl){tpl.goal=q.goal;
+          // apply to future days that aren't manually overridden
+          Object.keys(S.days).filter(dk=>dk>k).forEach(dk=>{
+            const fq=S.days[dk].quota.find(x=>x.id===q.id);if(fq&&!fq.manual)fq.goal=q.goal;});
+        }
+      }else q.manual=true;
+      scheduleSave();renderWeek();renderWeekStats();
+    });
+    // delete completely
+    document.querySelectorAll("#ql [data-rm]").forEach(el=>el.onclick=()=>{
+      const q=d.quota[+el.dataset.rm];
+      if(isFuture){
+        // remove from template and all future days
+        S.quotaTemplate=(S.quotaTemplate||[]).filter(x=>x.id!==q.id);
+        Object.keys(S.days).filter(dk=>dk>=k).forEach(dk=>{
+          S.days[dk].quota=S.days[dk].quota.filter(x=>x.id!==q.id);});
+      }else{
+        d.quota.splice(+el.dataset.rm,1);
+      }
+      scheduleSave();render();draw();
+    });
+    document.getElementById("qadd").onclick=()=>{
+      const nid=uid();
+      const q={id:nid,n:"Новый показатель",goal:1,done:0,moved:0,extra:0,skipped:0};
+      d.quota.push(q);
+      if(isFuture)S.quotaTemplate.push({id:nid,n:"Новый показатель",goal:1});
+      scheduleSave();render();draw();
+    };
   };draw();
 }
 
@@ -815,9 +864,9 @@ function statColor(pct){
 function renderWeekStats(){
   const box=document.getElementById("wstats");box.innerHTML="";
   const dow=dateOf(sel).getDay(),start=shift(sel,-((dow+6)%7));
-  const ids=[...new Set((S.rules||[]).map(r=>r.qid))];
+  const ids=(S.quotaTemplate||[]).map(t=>t.id);
   ids.forEach(qid=>{
-    const rule=(S.rules||[]).find(r=>r.qid===qid);if(!rule)return;
+    const tpl=(S.quotaTemplate||[]).find(t=>t.id===qid);if(!tpl)return;
     let totalGoal=0,totalDone=0;
     for(let i=0;i<7;i++){
       const k=shift(start,i),d=day(k);
@@ -830,7 +879,7 @@ function renderWeekStats(){
     const pct=Math.min(100,Math.round(totalDone/totalGoal*100));
     const col=statColor(pct);
     const el=document.createElement("div");el.className="wstat";
-    el.innerHTML='<div class="wsn">'+esc(rule.n)+' за неделю</div>'+
+    el.innerHTML='<div class="wsn">'+esc(tpl.n)+' за неделю</div>'+
       '<div class="wsv" style="color:'+col+'">'+totalDone+" / "+totalGoal+'</div>'+
       '<div class="wsbar"><i style="width:'+pct+'%;background:'+col+'"></i></div>';
     box.appendChild(el);
@@ -915,112 +964,82 @@ function renderBonus(){
 function renderSocials(){
   const box=document.getElementById("socials");box.innerHTML="";
   const period=S.socialPeriod||30;
+  const combined=S.socialCombined||false;
   const cutoff=shift(todayKey(),-period);
 
   // period tabs
   const tabs=document.createElement("div");
   tabs.style.cssText="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap";
-  [7,30,90,365].forEach(p=>{
-    const b=document.createElement("button");
-    b.textContent=p===7?"7 дн":p===30?"30 дн":p===90?"3 мес":"год";
+  [[7,"7 дней"],[30,"30 дней"],[90,"3 мес"],[365,"год"]].forEach(([p,lbl])=>{
+    const b=document.createElement("button");b.textContent=lbl;
     b.style.cssText="padding:5px 10px;border-radius:8px;border:1px solid var(--line);font-size:13px;cursor:pointer;"+
-      "background:"+(p===period?"#9b1a4a":"#f5f0f3")+";color:"+(p===period?"#fff":"var(--ink2)");
+      "background:"+(p===period?"var(--blue)":"var(--card)")+";color:"+(p===period?"#fff":"var(--ink2)");
     b.onclick=()=>{S.socialPeriod=p;scheduleSave();renderSocials()};
     tabs.appendChild(b);
   });
+  const cb=document.createElement("button");cb.textContent="Все соцсети";
+  cb.style.cssText="padding:5px 10px;border-radius:8px;border:1px solid var(--line);font-size:13px;cursor:pointer;margin-left:auto;"+
+    "background:"+(combined?"var(--blue)":"var(--card)")+";color:"+(combined?"#fff":"var(--ink2)");
+  cb.onclick=()=>{S.socialCombined=!combined;scheduleSave();renderSocials()};
+  tabs.appendChild(cb);
   box.appendChild(tabs);
 
   const socs=S.socials||[];
-  if(!socs.length){
-    box.innerHTML+='<div style="color:var(--mut);font-size:14px;text-align:center;padding:20px 0">Добавь соцсети через кнопку выше</div>';
-    return;
-  }
+  if(!socs.length){box.innerHTML+='<div style="color:var(--mut);font-size:14px;text-align:center;padding:16px 0">Добавь соцсети кнопкой ниже</div>';}
 
-  // Table: rows = dates, columns = networks
-  const allDates=[...new Set(socs.flatMap(s=>(s.entries||[]).map(e=>e.d)))].filter(d=>d>=cutoff).sort();
+  const spark=(entries,color,W,H)=>{
+    const recent=(entries||[]).filter(e=>e.d>=cutoff);
+    if(recent.length<2)return{svg:"",n:recent.length};
+    const vals=recent.map(e=>e.v),mn=Math.min(...vals),mx=Math.max(...vals),range=mx-mn||1;
+    const pts=recent.map((e,i)=>Math.round(i/(recent.length-1)*(W-6)+3)+","+Math.round(H-4-(e.v-mn)/range*(H-8)));
+    return{svg:'<polyline points="'+pts.join(" ")+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',n:recent.length};
+  };
 
-  if(allDates.length){
-    const tbl=document.createElement("div");
-    tbl.style.cssText="overflow-x:auto;margin-bottom:14px";
-    let html='<table style="width:100%;border-collapse:collapse;font-size:13px">'+
-      '<thead><tr><th style="text-align:left;padding:6px 8px;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--line)">Дата</th>'+
-      socs.map(s=>'<th style="text-align:right;padding:6px 8px;color:'+(s.color||"var(--blue)")+';font-weight:700;border-bottom:1px solid var(--line)">'+esc(s.name)+'</th>').join("")+
-      '</tr></thead><tbody>';
-    allDates.slice().reverse().forEach(date=>{
-      html+='<tr><td style="padding:6px 8px;color:var(--ink2);white-space:nowrap">'+shortHuman(date)+'</td>'+
-        socs.map(s=>{
-          const e=(s.entries||[]).find(x=>x.d===date);
-          return'<td style="text-align:right;padding:6px 8px;font-family:var(--mono)">'+
-            (e!=null?e.v.toLocaleString("ru"):'<span style="color:var(--mut)">—</span>')+'</td>';
-        }).join("")+'</tr>';
+  if(combined){
+    // one graph, all networks overlaid
+    const W=box.clientWidth-8||260,H=140;
+    let lines="";
+    socs.forEach(s=>{const r=spark(s.entries,s.color||"var(--blue)",W,H);lines+=r.svg});
+    const legend=socs.map(s=>'<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin:0 10px 4px 0"><span style="width:14px;height:3px;background:'+(s.color||"#b02a63")+';border-radius:2px;display:inline-block"></span>'+esc(s.name)+'</span>').join("");
+    const g=document.createElement("div");
+    g.innerHTML='<div style="margin-bottom:8px">'+legend+'</div>'+
+      (lines?'<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="display:block;overflow:visible">'+lines+'</svg>':
+      '<div style="color:var(--mut);font-size:13px;padding:10px 0">Нужно минимум 2 записи за период</div>');
+    box.appendChild(g);
+  }else{
+    // individual cards
+    socs.forEach(soc=>{
+      const entries=soc.entries||[];
+      const last=entries[entries.length-1];
+      const recent=entries.filter(e=>e.d>=cutoff);
+      const first=recent[0];
+      const val=last?last.v:null;
+      const delta=first&&last&&first!==last?last.v-first.v:null;
+      const el=document.createElement("div");el.className="soc";el.style.marginBottom="8px";
+      const r=spark(entries,soc.color||"var(--blue)",box.clientWidth-40||220,44);
+      el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center">'+
+        '<span class="sname" style="color:'+(soc.color||"var(--blue)")+'">'+esc(soc.name)+'</span>'+
+        '<button class="ed" style="border:none;background:none;color:var(--mut);cursor:pointer;font-size:13px">✎</button></div>'+
+        '<div class="sval">'+(val!=null?val.toLocaleString("ru"):"—")+'</div>'+
+        '<div class="sdelta '+(delta==null?"same":delta>0?"up":"dn")+'" style="font-size:12px">'+
+          (delta==null?"нет динамики":(delta>0?"+":"")+delta.toLocaleString("ru")+" за период")+'</div>'+
+        (r.svg?'<svg width="100%" height="44" viewBox="0 0 '+(box.clientWidth-40||220)+' 44" preserveAspectRatio="none" style="display:block;margin-top:6px">'+r.svg+'</svg>':
+          '<div style="font-size:11px;color:var(--mut);margin-top:4px">'+(r.n===1?"нужна ещё одна запись":"нет данных за период")+'</div>')+
+        '<input type="number" placeholder="обновить число" min="0" style="margin-top:8px;width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:var(--card)">';
+      el.querySelector(".ed").onclick=()=>socialModal(soc);
+      el.querySelector("input").onchange=e=>{
+        const v=+e.target.value;if(isNaN(v)||v<0)return;
+        soc.entries=soc.entries||[];
+        soc.entries=soc.entries.filter(x=>x.d!==todayKey());
+        soc.entries.push({d:todayKey(),v});
+        soc.entries.sort((a,b)=>a.d<b.d?-1:1);
+        e.target.value="";scheduleSave();renderSocials();toast(soc.name+": "+v.toLocaleString("ru"))};
+      box.appendChild(el);
     });
-    html+='</tbody></table>';
-    tbl.innerHTML=html;
-    box.appendChild(tbl);
-
-    // Combined SVG graph
-    if(allDates.length>=2){
-      const W=box.clientWidth||260,H=90;
-      const COLORS=socs.map(s=>s.color||"#9b1a4a");
-      let svgLines="";
-      socs.forEach((soc,si)=>{
-        const pts=allDates.map((d,i)=>{
-          const e=(soc.entries||[]).find(x=>x.d===d);
-          return e!=null?e.v:null;
-        });
-        const valid=pts.filter(v=>v!=null);
-        if(valid.length<2)return;
-        const mn=Math.min(...valid),mx=Math.max(...valid),range=mx-mn||1;
-        const coords=[];
-        pts.forEach((v,i)=>{
-          if(v==null)return;
-          const x=Math.round(i/(allDates.length-1)*(W-20)+10);
-          const y=Math.round(H-8-(v-mn)/range*(H-16));
-          coords.push(x+","+y);
-        });
-        if(coords.length>=2)
-          svgLines+='<polyline points="'+coords.join(" ")+'" fill="none" stroke="'+COLORS[si]+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>';
-      });
-      if(svgLines){
-        const legend=socs.map((s,i)=>'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-right:10px">'+
-          '<span style="display:inline-block;width:12px;height:3px;background:'+(s.color||"#9b1a4a")+';border-radius:2px"></span>'+esc(s.name)+'</span>').join("");
-        const g=document.createElement("div");
-        g.innerHTML='<div style="margin-bottom:6px">'+legend+'</div>'+
-          '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="display:block;overflow:visible">'+svgLines+'</svg>';
-        box.appendChild(g);
-      }
-    }
   }
-
-  // Input row for today
-  const addRow=document.createElement("div");
-  addRow.style.cssText="margin-top:12px;display:flex;flex-direction:column;gap:6px";
-  socs.forEach(soc=>{
-    const last=(soc.entries||[]).slice(-1)[0];
-    const r=document.createElement("div");
-    r.style.cssText="display:flex;align-items:center;gap:8px";
-    r.innerHTML='<span style="font-size:13px;color:'+(soc.color||"var(--mut)")+';font-weight:700;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(soc.name)+'</span>'+
-      '<span style="font-family:var(--mono);font-size:13px;color:var(--ink2);min-width:60px">'+
-        (last?last.v.toLocaleString("ru"):"—")+'</span>'+
-      '<input type="number" placeholder="новое" min="0" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:var(--card)">'+
-      '<button style="border:none;background:none;color:var(--mut);font-size:13px;cursor:pointer">✎</button>';
-    r.querySelector("input").onchange=e=>{
-      const v=+e.target.value;if(isNaN(v)||v<0)return;
-      soc.entries=soc.entries||[];
-      // remove duplicate for today if exists
-      soc.entries=soc.entries.filter(x=>x.d!==todayKey());
-      soc.entries.push({d:todayKey(),v});
-      soc.entries.sort((a,b)=>a.d<b.d?-1:1);
-      if(soc.entries.length>365)soc.entries=soc.entries.slice(-365);
-      e.target.value="";scheduleSave();renderSocials();toast(soc.name+": "+v.toLocaleString("ru"))};
-    r.querySelector("button").onclick=()=>socialModal(soc);
-    addRow.appendChild(r);
-  });
-  box.appendChild(addRow);
+  const add=document.createElement("button");add.className="soc-add";add.textContent="+ Добавить соцсеть";
+  add.style.marginTop="8px";add.onclick=()=>socialModal(null);box.appendChild(add);
 }
-
-document.getElementById("socTabAll").onclick=()=>{S.socialPeriod=365;scheduleSave();renderSocials()};
-document.getElementById("socTabEdit").onclick=()=>socialModal(null);
 
 function socialModal(soc){
   const isNew=!soc;
@@ -1209,64 +1228,6 @@ function undoCarryModal(k){
 }
 
 
-function ruleText(r){const a=r.amount+" шт";if(r.mode==="daily")return a+" · каждый день";if(r.mode==="weekdays"){const dn=DOW.filter(x=>(r.days||[]).includes(x[0])).map(x=>x[1]);return a+" · "+dn.join(", ")}if(r.mode==="cycle")return a+" · "+r.on+"/"+r.off+" с "+shortHuman(r.start);return a+" · каждые "+r.every+" дн."}
-function repeatsModal(){
-  const draw=()=>{
-    openModal('<h3>Повторяющиеся задачи</h3><p class="lead">Норма на каждый день — как в Google Calendar. Задача не повторяется в этот день → строка не показывается.</p>'+
-      '<div id="rl">'+(S.rules.length?S.rules.map(r=>'<button class="opt" data-r="'+r.id+'"><b>'+esc(r.n)+'</b><span>'+ruleText(r)+'</span></button>').join(""):'<p style="color:var(--mut)">Ничего нет</p>')+'</div>'+
-      '<button class="smalladd" id="radd" style="width:auto;padding:9px 16px">+ повторяющаяся задача</button>'+
-      '<div class="acts"><button class="go" data-x>Готово</button></div>');
-    document.querySelectorAll("#rl .opt").forEach(b=>b.onclick=()=>ruleModal(S.rules.find(r=>r.id===b.dataset.r),draw));
-    document.getElementById("radd").onclick=()=>ruleModal(null,draw);
-  };draw();
-}
-function ruleModal(r,back){
-  const isNew=!r;const d=r?JSON.parse(JSON.stringify(r)):{id:uid(),qid:uid(),n:"",amount:1,mode:"daily",days:[1,2,3,4,5,6,0],on:2,off:2,every:2,start:todayKey()};
-  const draw=()=>{
-    openModal('<h3>'+(isNew?"Новый повтор":"Изменить повтор")+'</h3>'+
-      '<div class="two"><div class="mf"><label>Название</label><input type="text" id="rn" value="'+esc(d.n)+'" placeholder="Например: обычные ролики"></div>'+
-      '<div class="mf"><label>Количество в день</label><input type="number" id="ra" min="1" value="'+d.amount+'"></div></div>'+
-      '<div class="mf"><label>Повторять</label><div class="chips" id="rm">'+
-        [["daily","Каждый день"],["weekdays","По дням недели"],["cycle","График смен"],["everyN","Каждые N дней"]].map(x=>'<button class="chip'+(d.mode===x[0]?" on":"")+'" data-m="'+x[0]+'">'+x[1]+"</button>").join("")+
-      '</div><div id="rbody" style="margin-top:12px"></div></div>'+
-      '<div class="hint" id="rprev"></div>'+
-      '<div class="acts">'+(isNew?"":'<button class="del" id="rdel">Удалить</button>')+'<button id="rback">Назад</button><button class="go" id="rgo">'+(isNew?"Добавить":"Сохранить")+"</button></div>");
-    document.getElementById("rn").oninput=e=>{d.n=e.target.value;prev()};
-    document.getElementById("ra").oninput=e=>{d.amount=Math.max(1,+e.target.value||1);prev()};
-    document.querySelectorAll("#rm .chip").forEach(b=>b.onclick=()=>{d.mode=b.dataset.m;document.querySelectorAll("#rm .chip").forEach(x=>x.classList.remove("on"));b.classList.add("on");body()});
-    function body(){
-      const box=document.getElementById("rbody");
-      if(d.mode==="weekdays"){
-        box.innerHTML='<div class="chips">'+DOW.map(x=>'<button class="chip'+((d.days||[]).includes(x[0])?" on":"")+'" data-d="'+x[0]+'">'+x[1]+"</button>").join("")+"</div>";
-        box.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{const v=+b.dataset.d;d.days=(d.days||[]).includes(v)?d.days.filter(x=>x!==v):[...(d.days||[]),v];b.classList.toggle("on");prev()});
-      }else if(d.mode==="cycle"){
-        box.innerHTML='<div class="subrow"><span style="flex:1">Работаю дней</span><input type="number" id="ron" min="1" value="'+d.on+'" style="width:75px"></div>'+
-          '<div class="subrow"><span style="flex:1">Выходных</span><input type="number" id="roff" min="0" value="'+d.off+'" style="width:75px"></div>'+
-          '<div class="subrow"><span style="flex:1">Первый рабочий день</span><input type="date" id="rst" value="'+d.start+'" style="width:auto"></div>';
-        box.querySelector("#ron").oninput=e=>{d.on=Math.max(1,+e.target.value||1);prev()};
-        box.querySelector("#roff").oninput=e=>{d.off=Math.max(0,+e.target.value||0);prev()};
-        box.querySelector("#rst").onchange=e=>{d.start=e.target.value;prev()};
-      }else if(d.mode==="everyN"){
-        box.innerHTML='<div class="subrow"><span style="flex:1">Каждые</span><input type="number" id="rev" min="1" value="'+d.every+'" style="width:75px"><span>дн.</span></div>'+
-          '<div class="subrow"><span style="flex:1">Начиная с</span><input type="date" id="rst" value="'+d.start+'" style="width:auto"></div>';
-        box.querySelector("#rev").oninput=e=>{d.every=Math.max(1,+e.target.value||1);prev()};
-        box.querySelector("#rst").onchange=e=>{d.start=e.target.value;prev()};
-      }else box.innerHTML='<div class="hint">Задача будет каждый день.</div>';
-      prev();
-    }
-    function prev(){let out=[];for(let i=0;i<14;i++){const k=shift(todayKey(),i);if(ruleHits(d,k))out.push(SHORT[dateOf(k).getDay()]+" "+dateOf(k).getDate())}document.getElementById("rprev").innerHTML="Ближайшие 2 недели: "+(out.length?out.join(" · "):"ни одного дня")}
-    body();
-    document.getElementById("rback").onclick=()=>{closeModal();back()};
-    if(!isNew)document.getElementById("rdel").onclick=()=>{S.rules=S.rules.filter(x=>x.id!==d.id);closeModal();scheduleSave();render();back()};
-    document.getElementById("rgo").onclick=()=>{
-      d.n=d.n.trim()||"Без названия";
-      const twin=S.rules.find(x=>x.id!==d.id&&x.n.toLowerCase()===d.n.toLowerCase());if(twin)d.qid=twin.qid;
-      if(isNew)S.rules.push(d);else Object.assign(r,d);
-      S.rules.filter(x=>x.qid===d.qid).forEach(x=>x.n=d.n);
-      closeModal();scheduleSave();render();back()};
-  };draw();
-}
-document.getElementById("repeatsbtn")&&(document.getElementById("repeatsbtn").onclick=repeatsModal);
 
 /* ---------- goals ---------- */
 function goalsModal(first){
@@ -1355,5 +1316,10 @@ document.addEventListener("keydown",e=>{if(document.getElementById("mask").class
 /* ---------- toast ---------- */
 let tt;function toast(m){const e=document.getElementById("toast");e.textContent=m;e.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>e.classList.remove("on"),6000)}
 
+document.querySelectorAll("#themeSwitch button").forEach(b=>b.onclick=()=>{
+  const t=b.dataset.theme;
+  document.body.setAttribute("data-theme",t);
+  if(S){S.theme=t;scheduleSave();}
+});
 initAuth();
 </script>
