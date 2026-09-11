@@ -402,10 +402,24 @@ function scheduleSave(){
 }
 
 /* ---------- state ---------- */
-const defaultQuotaTemplate=()=>[
-  {id:"ob",n:"Обычные",goal:2},
-  {id:"ch",n:"Челлендж",goal:1}
-];
+// Reference anchor: a known Monday. 2024-01-01 was a Monday.
+const CYCLE_ANCHOR="2024-01-01";
+const CYCLE_LEN=14;
+function cycleSlot(k){
+  // returns 0..13 — which day of the 2-week cycle this date is
+  const n=daysBetween(CYCLE_ANCHOR,k);
+  return((n%CYCLE_LEN)+CYCLE_LEN)%CYCLE_LEN;
+}
+// schedule: { quotaId: {n, slots:{0:goal,1:goal,...}} }  goal per cycle-slot
+function defaultSchedule(){
+  const ob={},ch={};
+  for(let i=0;i<CYCLE_LEN;i++){ob[i]=2;ch[i]=(i%2===0)?1:0;}
+  return[
+    {id:"ob",n:"Обычные",slots:ob},
+    {id:"ch",n:"Челлендж",slots:ch}
+  ];
+}
+const defaultQuotaTemplate=defaultSchedule;
 function seed(){
   return{days:{},bonus:[
     {id:uid(),n:"Скачать видео для монтажа",star:false,due:null,doneOn:null},
@@ -417,7 +431,7 @@ function seed(){
     {id:uid(),name:"Telegram",handle:"soweru",color:"#229ED9",entries:[]},
     {id:uid(),name:"Instagram",handle:"soweru",color:"#E1306C",entries:[]}
   ],profile:{onboarded:false,goals:[],joys:[],about:"",lastAsk:null,dreamShown:null,dreamHidden:null},
-  carries:[],quotaTemplate:defaultQuotaTemplate(),weekStart:null,dayTemplate:null,theme:"pink"};
+  carries:[],schedule:defaultSchedule(),weekStart:null,dayTemplate:null,theme:"pink"};
 }
 function migrate(o){
   if(!o||typeof o!=="object")return seed();
@@ -429,13 +443,12 @@ function migrate(o){
   s.socials=o.socials||s.socials;
   s.weekStart=o.weekStart||null;
   s.theme=o.theme||"pink";
-  // migrate old rules -> quotaTemplate
-  if(o.quotaTemplate){s.quotaTemplate=o.quotaTemplate}
-  else if(o.rules){
-    const seen={};s.quotaTemplate=[];
-    o.rules.forEach(r=>{if(!seen[r.qid]){seen[r.qid]=1;s.quotaTemplate.push({id:r.qid,n:r.n,goal:+r.amount||1})}});
-    if(!s.quotaTemplate.length)s.quotaTemplate=defaultQuotaTemplate();
-  }else s.quotaTemplate=defaultQuotaTemplate();
+  // migrate schedule
+  if(o.schedule){s.schedule=o.schedule}
+  else if(o.quotaTemplate){
+    // old flat template -> apply same goal to all 14 slots
+    s.schedule=o.quotaTemplate.map(t=>{const slots={};for(let i=0;i<CYCLE_LEN;i++)slots[i]=t.goal;return{id:t.id,n:t.n,slots}});
+  }else s.schedule=defaultSchedule();
   if(o.bonus&&Array.isArray(o.bonus)){
     s.bonus=o.bonus.map(b=>({id:b.id||uid(),n:(b.n||"").replace(/^★\s*/,""),star:b.star||/^★/.test(b.n||""),due:b.due||null,doneOn:b.doneOn||null}));
   }
@@ -459,21 +472,24 @@ function migrate(o){
   return s;
 }
 
-/* ---------- quota system: template applied per day ---------- */
+/* ---------- quota system: 14-day cycle schedule ---------- */
+function scheduleGoal(sch,k){
+  const slot=cycleSlot(k);
+  return(sch.slots&&sch.slots[slot]!=null)?sch.slots[slot]:0;
+}
 function applyRules(k,d){
-  // Each day gets quota rows from the template. Existing done/carry state preserved.
-  (S.quotaTemplate||[]).forEach(tpl=>{
-    let q=d.quota.find(x=>x.id===tpl.id);
+  (S.schedule||[]).forEach(sch=>{
+    const goal=scheduleGoal(sch,k);
+    let q=d.quota.find(x=>x.id===sch.id);
     if(!q){
-      // only auto-add template rows to today and future days
-      if(k>=todayKey()){
-        q={id:tpl.id,n:tpl.n,goal:tpl.goal,done:0,moved:0,extra:0,skipped:0};
+      // add row to today/future days if this slot has a goal, or keep for stats
+      if(k>=todayKey()&&goal>0){
+        q={id:sch.id,n:sch.n,goal:goal,done:0,moved:0,extra:0,skipped:0};
         d.quota.push(q);
       }
     }else{
-      // keep name in sync with template unless manually renamed
-      if(!q.manualName)q.n=tpl.n;
-      if(!q.manual)q.goal=tpl.goal;
+      if(!q.manualName)q.n=sch.n;
+      if(!q.manual)q.goal=goal;
     }
   });
 }
@@ -720,11 +736,54 @@ const MOTIV=[
   "Финансы, контент, учёба — всё это кирпичики. Ты строишь дом.",
   "Даже 20 минут работы лучше нуля.",
   "Не ждать идеального момента — и есть идеальный момент.",
-  "Сегодня — это завтрашнее вчера. Не потеряй его."
+  "Сегодня — это завтрашнее вчера. Не потеряй его.",
+  "Мотивация приходит после действия, а не до. Начни — и захочется.",
+  "Ты не обязана всё успеть. Ты обязана не бросить.",
+  "Плохой ролик, который вышел, лучше идеального, который в голове.",
+  "Твои маленькие ежедневные привычки решают, кем ты станешь.",
+  "Никто не начинал сразу хорошо. Все начинали просто.",
+  "Успех — это сумма мелочей, повторённых день за днём.",
+  "Не бойся идти медленно. Бойся стоять на месте.",
+  "Сравнивай себя только с той, кем ты была вчера.",
+  "Сложное становится простым, когда делаешь это каждый день.",
+  "Ты можешь всё. Только не всё сразу.",
+  "Каждый «нет» приближает к «да». Продолжай.",
+  "Талант — это интерес, доведённый до дисциплины.",
+  "Лучше сделать и переделать, чем ждать и не сделать.",
+  "Твоё будущее строится из того, что ты делаешь сегодня, а не завтра.",
+  "Устала — отдохни, но не сдавайся.",
+  "Маленькие победы тоже победы. Считай их.",
+  "Ты не отстаёшь. У тебя свой темп.",
+  "Дело не в том, чтобы найти время. Дело в том, чтобы его выделить.",
+  "Один процент лучше каждый день — это в 37 раз лучше за год.",
+  "Начатое дело уже наполовину сделано.",
+  "Страшно — значит, важно. Делай со страхом.",
+  "Ты сильнее любого своего оправдания.",
+  "Не жди вдохновения. Садись и работай — оно догонит.",
+  "Каждая привычка — это голос за то, кем ты хочешь стать.",
+  "Мир принадлежит тем, кто доделывает.",
+  "Твоя дисциплина сегодня — твоя свобода завтра.",
+  "Не количество часов, а что ты в них вложила.",
+  "Провал — это не противоположность успеха, а его часть.",
+  "Просто покажись. Половина успеха — прийти и начать.",
+  "Ты не ленивая. Ты уставшая. Это разное. Отдохни и вернись.",
+  "Большие цели пугают. Разбей на маленькие — и вперёд.",
+  "Каждый день, когда ты не сдалась, — это уже достижение.",
+  "Фокус — это говорить «нет» сотне хороших идей.",
+  "Ты растёшь даже тогда, когда не видишь результата.",
+  "Делай сегодня то, за что завтрашняя ты скажет спасибо.",
+  "Последовательность бьёт интенсивность.",
+  "Не идеально, но сделано — это твоя новая планка.",
+  "Ты уже прошла столько. Ещё немного.",
+  "Верь в процесс, даже когда не видишь итог.",
+  "Каждое утро — новый шанс всё начать заново."
 ];
 function getTodayQuote(){
+  // seeded random per day so it stays same all day but varies daily
   const d=dateOf(todayKey());
-  const idx=(d.getFullYear()*366+d.getMonth()*31+d.getDate())%MOTIV.length;
+  const seed=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+  const rnd=(Math.sin(seed)*10000)%1;
+  const idx=Math.floor(Math.abs(rnd)*MOTIV.length)%MOTIV.length;
   return MOTIV[idx];
 }
 
@@ -796,47 +855,61 @@ function renderWeek(){
 function quotaModal(k){
   const d=day(k);
   const isFuture=k>=todayKey();
+  const slot=cycleSlot(k);
+  const dow=dateOf(k).getDay();
+  const weekParity=slot<7?"первой":"второй";
   const draw=()=>{
     openModal('<h3>План на '+human(k).toLowerCase()+'</h3>'+
-      '<p class="lead">Меняй количество стрелками или числом. Изменения применяются '+(isFuture?'к этому дню и всем будущим':'только к этому дню')+'. Крестик полностью удаляет показатель.</p>'+
+      '<p class="lead">Расписание повторяется каждые 2 недели. Изменения этого дня применятся ко всем таким же дням вперёд — то есть к каждому '+DAYNAMES[dow].toLowerCase()+' '+weekParity+' недели цикла. Прошлое не трогается.</p>'+
       '<div id="ql">'+d.quota.map((q,i)=>'<div class="subrow">'+
         '<input type="text" data-n="'+i+'" value="'+esc(q.n)+'" style="flex:1">'+
         '<input type="number" data-g="'+i+'" min="0" value="'+q.goal+'" style="width:75px">'+
-        '<button data-rm="'+i+'" style="padding:0 10px" title="Удалить показатель">×</button></div>').join("")+'</div>'+
+        '<button data-rm="'+i+'" style="padding:0 10px" title="Удалить">×</button></div>').join("")+'</div>'+
       '<button class="smalladd" id="qadd" style="width:auto;padding:9px 16px;margin-top:8px">+ добавить показатель</button>'+
       '<div class="acts"><button class="go" data-x>Готово</button></div>');
-    // edit name
+    // helper: apply to all future days sharing this cycle-slot
+    const applyForward=(qid,fn)=>{
+      Object.keys(S.days).filter(dk=>dk>=k&&cycleSlot(dk)===slot).forEach(dk=>{
+        const fq=S.days[dk].quota.find(x=>x.id===qid);if(fq)fn(fq,dk);
+      });
+    };
+    // edit name — applies to whole schedule item (name is global)
     document.querySelectorAll("#ql [data-n]").forEach(el=>el.oninput=e=>{
-      const q=d.quota[+el.dataset.n];q.n=e.target.value;q.manualName=true;
-      // sync to template + future days
-      const tpl=(S.quotaTemplate||[]).find(x=>x.id===q.id);
-      if(tpl&&isFuture){tpl.n=e.target.value;
+      const q=d.quota[+el.dataset.n];q.n=e.target.value;
+      const sch=(S.schedule||[]).find(x=>x.id===q.id);
+      if(sch&&isFuture){sch.n=e.target.value;
         Object.keys(S.days).filter(dk=>dk>=k).forEach(dk=>{
           const fq=S.days[dk].quota.find(x=>x.id===q.id);if(fq&&!fq.manualName)fq.n=e.target.value;});
-      }
+      }else{q.manualName=true;}
       scheduleSave();
     });
-    // edit goal
+    // edit goal — applies to this cycle-slot forward
     document.querySelectorAll("#ql [data-g]").forEach(el=>el.oninput=e=>{
       const q=d.quota[+el.dataset.g];q.goal=Math.max(0,+e.target.value||0);
       if(isFuture){
-        const tpl=(S.quotaTemplate||[]).find(x=>x.id===q.id);
-        if(tpl){tpl.goal=q.goal;
-          // apply to future days that aren't manually overridden
-          Object.keys(S.days).filter(dk=>dk>k).forEach(dk=>{
-            const fq=S.days[dk].quota.find(x=>x.id===q.id);if(fq&&!fq.manual)fq.goal=q.goal;});
+        const sch=(S.schedule||[]).find(x=>x.id===q.id);
+        if(sch){sch.slots[slot]=q.goal;
+          applyForward(q.id,(fq)=>{if(!fq.manual)fq.goal=q.goal;});
         }
       }else q.manual=true;
       scheduleSave();renderWeek();renderWeekStats();
     });
-    // delete completely
+    // delete — set this slot to 0 forward (and remove empty rows)
     document.querySelectorAll("#ql [data-rm]").forEach(el=>el.onclick=()=>{
       const q=d.quota[+el.dataset.rm];
       if(isFuture){
-        // remove from template and all future days
-        S.quotaTemplate=(S.quotaTemplate||[]).filter(x=>x.id!==q.id);
-        Object.keys(S.days).filter(dk=>dk>=k).forEach(dk=>{
-          S.days[dk].quota=S.days[dk].quota.filter(x=>x.id!==q.id);});
+        const sch=(S.schedule||[]).find(x=>x.id===q.id);
+        if(sch){
+          sch.slots[slot]=0;
+          // if all slots now 0, remove schedule item entirely
+          const allZero=Object.values(sch.slots).every(v=>!v);
+          if(allZero){
+            S.schedule=S.schedule.filter(x=>x.id!==q.id);
+            Object.keys(S.days).filter(dk=>dk>=k).forEach(dk=>{S.days[dk].quota=S.days[dk].quota.filter(x=>x.id!==q.id)});
+          }else{
+            applyForward(q.id,(fq,dk)=>{S.days[dk].quota=S.days[dk].quota.filter(x=>x.id!==q.id)});
+          }
+        }else d.quota.splice(+el.dataset.rm,1);
       }else{
         d.quota.splice(+el.dataset.rm,1);
       }
@@ -846,7 +919,10 @@ function quotaModal(k){
       const nid=uid();
       const q={id:nid,n:"Новый показатель",goal:1,done:0,moved:0,extra:0,skipped:0};
       d.quota.push(q);
-      if(isFuture)S.quotaTemplate.push({id:nid,n:"Новый показатель",goal:1});
+      if(isFuture){
+        const slots={};for(let i=0;i<CYCLE_LEN;i++)slots[i]=0;slots[slot]=1;
+        S.schedule.push({id:nid,n:"Новый показатель",slots});
+      }
       scheduleSave();render();draw();
     };
   };draw();
@@ -864,22 +940,21 @@ function statColor(pct){
 function renderWeekStats(){
   const box=document.getElementById("wstats");box.innerHTML="";
   const dow=dateOf(sel).getDay(),start=shift(sel,-((dow+6)%7));
-  const ids=(S.quotaTemplate||[]).map(t=>t.id);
+  const ids=(S.schedule||[]).map(t=>t.id);
   ids.forEach(qid=>{
-    const tpl=(S.quotaTemplate||[]).find(t=>t.id===qid);if(!tpl)return;
+    const sch=(S.schedule||[]).find(t=>t.id===qid);if(!sch)return;
     let totalGoal=0,totalDone=0;
     for(let i=0;i<7;i++){
       const k=shift(start,i),d=day(k);
       const q=d.quota.find(x=>x.id===qid);
-      if(!q)continue;
-      totalGoal+=q.goal;
-      totalDone+=q.done;
+      if(q){totalGoal+=q.goal;totalDone+=q.done;}
+      else totalGoal+=scheduleGoal(sch,k);
     }
     if(!totalGoal)return;
     const pct=Math.min(100,Math.round(totalDone/totalGoal*100));
     const col=statColor(pct);
     const el=document.createElement("div");el.className="wstat";
-    el.innerHTML='<div class="wsn">'+esc(tpl.n)+' за неделю</div>'+
+    el.innerHTML='<div class="wsn">'+esc(sch.n)+' за неделю</div>'+
       '<div class="wsv" style="color:'+col+'">'+totalDone+" / "+totalGoal+'</div>'+
       '<div class="wsbar"><i style="width:'+pct+'%;background:'+col+'"></i></div>';
     box.appendChild(el);
